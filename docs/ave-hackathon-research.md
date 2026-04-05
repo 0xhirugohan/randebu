@@ -610,12 +610,24 @@ class PaperTradingBot:
 
 ### 10.3 Testnet Considerations
 
+> **Important:** AVE Cloud **does not support testnet chains**. All API endpoints connect to production/mainnet:
+> - Data API: `https://prod.ave-api.com`
+> - Trading API: `https://bot-api.ave.ai`
+> - WebSocket: `wss://wss.ave-api.xyz`
+>
+> The testnet resources below are general blockchain testnets - they are **not** AVE Cloud testnets.
+
 | Chain | Testnet | Faucet |
 |-------|---------|--------|
 | BSC | https://testnet.bscscan.com | https://testnet.bnb.org |
 | Solana | https://api.devnet.solana.com | https://faucet.solana.com |
 | ETH | Sepolia testnet | https://sepoliafaucet.com |
 | Base | Base Sepolia | https://www.coinbase.com/faucets |
+
+**Safe testing without real money:**
+- Use **quote/dry-run mode** - All trading endpoints have a `quote` operation that simulates trades without execution
+- Execute with **minimal amounts** - Use tiny amounts (e.g., $1-10) to verify flows
+- **Contact AVE support** at `https://t.me/ave_ai_cloud` to ask about sandbox options
 
 ### 10.4 Mocking API Responses
 
