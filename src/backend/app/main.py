@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from .api import auth, bots, backtest, simulate, config
+from .api import auth, bots, backtest, simulate, config, ave
 from .core.limiter import limiter
 
 app = FastAPI(
@@ -26,6 +26,7 @@ app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
 app.include_router(backtest.router, prefix="/api", tags=["backtest"])
 app.include_router(simulate.router, prefix="/api", tags=["simulate"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
+app.include_router(ave.router, prefix="/api/ave", tags=["ave"])
 
 
 @app.get("/")
