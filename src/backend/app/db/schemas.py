@@ -91,3 +91,35 @@ class SimulationResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class BotConversationCreate(BaseModel):
+    role: str
+    content: str
+
+
+class BotConversationResponse(BaseModel):
+    id: str
+    bot_id: str
+    role: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SignalResponse(BaseModel):
+    id: str
+    bot_id: str
+    run_id: str
+    signal_type: str
+    token: str
+    price: float
+    confidence: Optional[float]
+    reasoning: Optional[str]
+    executed: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
