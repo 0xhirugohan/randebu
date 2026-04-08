@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, botsStore, setBots, addBot, removeBot, userStore, logout } from '$lib/stores';
 	import { api } from '$lib/api';
+	import { BotCard } from '$lib/components';
 
 	let showCreateModal = $state(false);
 	let newBotName = $state('');
@@ -30,7 +31,7 @@
 	}
 
 	async function createBot() {
-		if (!$newBotName.trim()) return;
+		if (!newBotName.trim()) return;
 		createError = '';
 		isCreating = true;
 		try {
@@ -95,19 +96,7 @@
 		{:else}
 			<div class="bots-grid">
 				{#each $botsStore as bot}
-					<div class="bot-card">
-						<div class="bot-info">
-							<h3>{bot.name}</h3>
-							{#if bot.description}
-								<p class="bot-description">{bot.description}</p>
-							{/if}
-							<span class="bot-status status-{bot.status}">{bot.status}</span>
-						</div>
-						<div class="bot-actions">
-							<a href="/bot/{bot.id}" class="btn btn-primary">Open</a>
-							<button onclick={() => deleteBot(bot.id)} class="btn btn-danger">Delete</button>
-						</div>
-					</div>
+					<BotCard {bot} onOpen={(id) => goto(`/bot/${id}`)} onDelete={deleteBot} />
 				{/each}
 			</div>
 		{/if}
@@ -201,57 +190,6 @@
 		gap: 1.5rem;
 	}
 
-	.bot-card {
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		border-radius: 12px;
-		padding: 1.5rem;
-	}
-
-	.bot-info {
-		margin-bottom: 1rem;
-	}
-
-	.bot-info h3 {
-		margin: 0 0 0.5rem;
-		font-size: 1.25rem;
-	}
-
-	.bot-description {
-		color: #888;
-		font-size: 0.9rem;
-		margin: 0 0 0.75rem;
-	}
-
-	.bot-status {
-		display: inline-block;
-		padding: 0.25rem 0.75rem;
-		border-radius: 9999px;
-		font-size: 0.75rem;
-		font-weight: 500;
-		text-transform: uppercase;
-	}
-
-	.status-draft {
-		background: rgba(251, 191, 36, 0.2);
-		color: #fbbf24;
-	}
-
-	.status-active {
-		background: rgba(34, 197, 94, 0.2);
-		color: #22c55e;
-	}
-
-	.status-paused {
-		background: rgba(251, 191, 36, 0.2);
-		color: #fbbf24;
-	}
-
-	.bot-actions {
-		display: flex;
-		gap: 0.75rem;
-	}
-
 	.btn {
 		padding: 0.5rem 1rem;
 		border-radius: 8px;
@@ -272,12 +210,6 @@
 		background: rgba(255, 255, 255, 0.1);
 		color: white;
 		border: 1px solid rgba(255, 255, 255, 0.2);
-	}
-
-	.btn-danger {
-		background: rgba(239, 68, 68, 0.2);
-		color: #fca5a5;
-		border: 1px solid rgba(239, 68, 68, 0.4);
 	}
 
 	.btn:hover {

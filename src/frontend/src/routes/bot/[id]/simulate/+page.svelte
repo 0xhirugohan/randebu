@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, currentBotStore, setCurrentBot, simulationStore, setCurrentSimulation, addSignals, clearSignals, setSimulationLoading, setSimulationError } from '$lib/stores';
 	import { api } from '$lib/api';
+	import { SignalChart, ProUpgradeBanner } from '$lib/components';
 
 	let botId = $derived($page.params.id);
 	let token = $state('PEPE');
@@ -142,12 +143,16 @@
 			</form>
 		</section>
 
+		<ProUpgradeBanner feature="Real-time WebSocket signals for instant trading decisions" />
+
 		<section class="signals-section">
 			<h2>Signals ({$simulationStore.signals.length})</h2>
 			
 			{#if $simulationStore.signals.length === 0}
 				<p class="empty-state">No signals yet. Start a simulation to see trading signals.</p>
 			{:else}
+				<SignalChart signals={$simulationStore.signals} height={200} />
+				
 				<div class="signals-list">
 					{#each $simulationStore.signals as signal}
 						<div class="signal-card">
