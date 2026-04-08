@@ -1,0 +1,21 @@
+[Unit]
+Description=Randebu Trading Bot Backend
+After=network.target
+
+[Service]
+Type=simple
+User=your-user
+WorkingDirectory=/var/www/bot/src/backend
+Environment="PATH=/var/www/bot/src/backend/venv/bin"
+ExecStart=/var/www/bot/src/backend/venv/bin/python /var/www/bot/src/backend/run.py
+Restart=always
+RestartSec=10
+
+EnvironmentFile=/var/www/bot/data/.env
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ave-backend
+
+[Install]
+WantedBy=multi-user.target
