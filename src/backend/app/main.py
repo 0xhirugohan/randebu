@@ -1,12 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from .api import auth, bots, backtest, simulate, config
+from .core.limiter import limiter
 
 app = FastAPI(
     title="Randebu Trading Bot API",
     description="AI-powered trading bot platform API",
     version="0.1.0",
 )
+
+app.state.limiter = limiter
 
 app.add_middleware(
     CORSMiddleware,
