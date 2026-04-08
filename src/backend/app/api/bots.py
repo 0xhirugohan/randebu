@@ -4,14 +4,18 @@ from typing import List, Annotated
 
 from .auth import get_current_user
 from ..core.database import get_db
+from ..core.config import get_settings
 from ..db.schemas import (
     BotCreate,
     BotUpdate,
     BotResponse,
     BotConversationCreate,
     BotConversationResponse,
+    BotChatRequest,
+    BotChatResponse,
 )
 from ..db.models import Bot, BotConversation, User
+from ..services.ai_agent.crew import get_trading_crew
 
 router = APIRouter()
 MAX_BOTS_PER_USER = 3
@@ -154,10 +158,10 @@ def delete_bot(
     db.commit()
 
 
-@router.post("/{bot_id}/chat", response_model=BotConversationResponse)
+@router.post("/{bot_id}/chat", response_model=BotChatResponse)
 def chat(
     bot_id: str,
-    message: BotConversationCreate,
+    request: BotChatRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Session = Depends(get_db),
 ):
@@ -173,15 +177,75 @@ def chat(
             detail="Not authorized to chat with this bot",
         )
 
-    db_conversation = BotConversation(
-        bot_id=bot_id,
-        role=message.role,
-        content=message.content,
+    conversation_history = (
+        db.query(BotConversation)
+        .filter(BotConversation.bot_id == bot_id)
+        .order_by(BotConversation.created_at)
+        .all()
     )
-    db.add(db_conversation)
-    db.commit()
-    db.refresh(db_conversation)
-    return db_conversation
+    history_for_crew = [
+        {"role": conv.role, "content": conv.content}
+        for conv in conversation_history[-10:]
+    ]
+
+    user_message = request.message
+    if request.strategy_config:
+        crew = get_trading_crew()
+        result = crew.chat(user_message, history_for_crew)
+
+        assistant_content = result.get("response", "I couldn't process your request.")
+        if result.get("success") and result.get("strategy_config"):
+            bot.strategy_config = result["strategy_config"]
+            db.commit()
+
+        db_conversation = BotConversation(
+            bot_id=bot_id,
+            role="user",
+            content=user_message,
+        )
+        db.add(db_conversation)
+
+        db_assistant = BotConversation(
+            bot_id=bot_id,
+            role="assistant",
+            content=assistant_content,
+        )
+        db.add(db_assistant)
+        db.commit()
+        db.refresh(db_assistant)
+
+        return BotChatResponse(
+            response=assistant_content,
+            strategy_config=result.get("strategy_config"),
+            success=result.get("success", False),
+        )
+    else:
+        crew = get_trading_crew()
+        result = crew.chat(user_message, history_for_crew)
+
+        assistant_content = result.get("response", "I couldn't process your request.")
+
+        db_conversation = BotConversation(
+            bot_id=bot_id,
+            role="user",
+            content=user_message,
+        )
+        db.add(db_conversation)
+
+        db_assistant = BotConversation(
+            bot_id=bot_id,
+            role="assistant",
+            content=assistant_content,
+        )
+        db.add(db_assistant)
+        db.commit()
+        db.refresh(db_assistant)
+
+        return BotChatResponse(
+            response=assistant_content,
+            strategy_config=result.get("strategy_config"),
+            success=result.get("success", False),
+        )
 
 
 @router.get("/{bot_id}/history", response_model=List[BotConversationResponse])
