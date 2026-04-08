@@ -23,6 +23,15 @@ class Token(BaseModel):
     token_type: str
 
 
+class UserSettings(BaseModel):
+    email: EmailStr
+
+
+class UserSettingsUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    password: Optional[str] = None
+
+
 class BotCreate(BaseModel):
     name: str
     description: Optional[str] = None
