@@ -4,6 +4,8 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, currentBotStore, setCurrentBot, backtestStore, setCurrentBacktest, addBacktestToHistory, setBacktestLoading, setBacktestError } from '$lib/stores';
 	import { api } from '$lib/api';
+	import { BacktestChart } from '$lib/components';
+	import type { Backtest } from '$lib/api';
 
 	let botId = $derived($page.params.id);
 	let token = $state('PEPE');
@@ -11,6 +13,7 @@
 	let startDate = $state('');
 	let endDate = $state('');
 	let isRunning = $state(false);
+	let selectedBacktest = $state<Backtest | null>(null);
 
 	onMount(async () => {
 		if (!$isAuthenticated && !$isLoading) {
@@ -75,6 +78,12 @@
 
 	function setBacktestHistory(backtests: any[]) {
 		backtestStore.update(state => ({ ...state, backtestHistory: backtests }));
+	}
+
+	function selectBacktest(backtest: Backtest) {
+		if (backtest.status === 'completed' && backtest.result) {
+			selectedBacktest = backtest;
+		}
 	}
 </script>
 
@@ -177,6 +186,16 @@
 				</div>
 			{/if}
 		</section>
+
+		{#if selectedBacktest}
+			<section class="chart-section">
+				<div class="chart-header">
+					<h2>Portfolio Performance</h2>
+					<button class="close-btn" onclick={() => selectedBacktest = null}>×</button>
+				</div>
+				<BacktestChart results={selectedBacktest.result} />
+			</section>
+		{/if}
 	</div>
 </main>
 
@@ -387,5 +406,37 @@
 		background: rgba(239, 68, 68, 0.2);
 		color: #fca5a5;
 		border: 1px solid rgba(239, 68, 68, 0.4);
+	}
+
+	.chart-section {
+		padding: 1.5rem;
+	}
+
+	.chart-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.chart-header h2 {
+		margin: 0;
+	}
+
+	.close-btn {
+		width: auto;
+		padding: 0.25rem 0.75rem;
+		background: rgba(255, 255, 255, 0.1);
+		border: none;
+		color: #888;
+		font-size: 1.5rem;
+		line-height: 1;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+
+	.close-btn:hover {
+		background: rgba(255, 255, 255, 0.2);
+		color: #fff;
 	}
 </style>
