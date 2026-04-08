@@ -25,6 +25,7 @@ class User(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     email = Column(String, unique=True, nullable=False)
     password_hash = Column(String, nullable=False)
+    tier = Column(String, default="free")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

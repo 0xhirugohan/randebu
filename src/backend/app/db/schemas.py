@@ -144,3 +144,72 @@ class SignalResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AveTokenSearchResponse(BaseModel):
+    tokens: List[dict]
+    upsell_message: Optional[str] = None
+
+
+class AveBatchPricesRequest(BaseModel):
+    token_ids: List[str]
+
+
+class AveBatchPricesResponse(BaseModel):
+    prices: Dict[str, dict]
+    upsell_message: Optional[str] = None
+
+
+class AveTokenDetailsResponse(BaseModel):
+    token: Optional[dict] = None
+    upsell_message: Optional[str] = None
+
+
+class AveKlinesRequest(BaseModel):
+    token_id: str
+    interval: str = "1h"
+    limit: int = 100
+    start_time: Optional[int] = None
+    end_time: Optional[int] = None
+
+
+class AveKlinesResponse(BaseModel):
+    klines: List[dict]
+    upsell_message: Optional[str] = None
+
+
+class AveTrendingTokensResponse(BaseModel):
+    tokens: List[dict]
+    upsell_message: Optional[str] = None
+
+
+class AveTokenRiskResponse(BaseModel):
+    risk: Optional[dict] = None
+    upsell_message: Optional[str] = None
+
+
+class AveChainQuoteRequest(BaseModel):
+    chain: str
+    from_token: str
+    to_token: str
+    amount: str
+    slippage: float = 0.5
+
+
+class AveChainQuoteResponse(BaseModel):
+    quote: Optional[dict] = None
+    upsell_message: Optional[str] = None
+
+
+class AveChainSwapRequest(BaseModel):
+    chain: str
+    from_token: str
+    to_token: str
+    amount: str
+    slippage: float = 0.5
+    wallet_address: Optional[str] = None
+
+
+class AveChainSwapResponse(BaseModel):
+    swap: Optional[dict] = None
+    upsell_message: Optional[str] = None
