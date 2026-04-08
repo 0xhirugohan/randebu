@@ -118,6 +118,17 @@ class BotConversationResponse(BaseModel):
         from_attributes = True
 
 
+class BotChatRequest(BaseModel):
+    message: str
+    strategy_config: Optional[bool] = False
+
+
+class BotChatResponse(BaseModel):
+    response: str
+    strategy_config: Optional[dict] = None
+    success: bool = False
+
+
 class SignalResponse(BaseModel):
     id: str
     bot_id: str
