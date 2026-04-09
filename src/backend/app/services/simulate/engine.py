@@ -1,8 +1,11 @@
 import uuid
 import asyncio
+import logging
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from ..ave.client import AveCloudClient
+
+logger = logging.getLogger(__name__)
 
 
 class SimulateEngine:
@@ -38,6 +41,7 @@ class SimulateEngine:
         self.entry_time: Optional[int] = None
         self.current_balance: float = config.get("initial_balance", 10000.0)
         self.trades: List[Dict[str, Any]] = []
+        self.errors: List[str] = []
 
     async def run(self) -> Dict[str, Any]:
         self.running = True
@@ -74,7 +78,9 @@ class SimulateEngine:
                         self.last_volume = current_volume
 
                 except Exception as e:
-                    pass
+                    logger.warning(f"Failed to get price for {token_id}: {e}")
+                    self.errors.append(f"Price fetch failed for {token_id}: {str(e)}")
+                    continue
 
                 for _ in range(self.check_interval):
                     if not self.running:
@@ -92,6 +98,8 @@ class SimulateEngine:
 
         self.results = self.results or {}
         self.results["total_signals"] = len(self.signals)
+        self.results["total_errors"] = len(self.errors)
+        self.results["errors"] = self.errors
         self.results["signals"] = self.signals
         self.results["started_at"] = self.started_at
         self.results["ended_at"] = datetime.utcnow()
