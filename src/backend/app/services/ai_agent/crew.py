@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from crewai import Agent, Task, Crew
 from .llm_connector import MiniMaxConnector, MiniMaxLLM
-from ..core.config import get_settings
+from ...core.config import get_settings
 
 
 class StrategyValidator:
