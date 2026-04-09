@@ -2,7 +2,7 @@ import uuid
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from ..backtest.ave_client import AveCloudClient
+from ..ave.client import AveCloudClient
 
 
 class SimulateEngine:

@@ -90,6 +90,22 @@ class AveCloudClient:
                 return data.get("data", [])
             raise Exception(f"Failed to fetch klines: {data}")
 
+    async def get_token_price(self, token_id: str) -> Optional[Dict[str, Any]]:
+        url = f"{self.DATA_API_URL}/v2/tokens/price"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                headers=self._data_headers(),
+                json={"token_ids": [token_id]},
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            data = response.json()
+            if data.get("status") == 200:
+                prices = data.get("data", {})
+                return prices.get(token_id)
+            return None
+
     async def get_trending_tokens(
         self, chain: Optional[str] = None, limit: int = 20
     ) -> List[Dict[str, Any]]:
