@@ -15,5 +15,5 @@ def get_chains():
 async def get_tokens():
     settings = get_settings()
     client = AveCloudClient(api_key=settings.AVE_API_KEY, plan=settings.AVE_API_PLAN)
-    tokens = await client.get_tokens(chain="bsc", limit=100)
+    tokens = await client.get_tokens(chain="bsc", limit=20)
     return {"tokens": tokens}
