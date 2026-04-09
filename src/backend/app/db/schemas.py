@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Any
+from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional, List, Any, Dict
 from datetime import datetime
 
 
@@ -69,6 +69,13 @@ class BacktestCreate(BaseModel):
     start_date: str
     end_date: str
 
+    @field_validator("chain")
+    @classmethod
+    def chain_must_be_bsc(cls, v: str) -> str:
+        if v != "bsc":
+            raise ValueError("Phase 1 only supports BSC (bnb chain)")
+        return v
+
 
 class BacktestResponse(BaseModel):
     id: str
@@ -89,6 +96,13 @@ class SimulationCreate(BaseModel):
     duration_seconds: int = 3600
     check_interval: int = 60
     auto_execute: bool = False
+
+    @field_validator("chain")
+    @classmethod
+    def chain_must_be_bsc(cls, v: str) -> str:
+        if v != "bsc":
+            raise ValueError("Phase 1 only supports BSC (bnb chain)")
+        return v
 
 
 class SimulationResponse(BaseModel):
