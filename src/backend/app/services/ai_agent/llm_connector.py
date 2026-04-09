@@ -61,9 +61,9 @@ class MiniMaxConnector:
         system_prompt = """You are a trading strategy designer. Parse the user's natural language request into a JSON strategy_config object.
 
 Supported conditions (MVP):
-- price_drop: Token price drops by X% (requires: token, threshold_percent)
-- price_rise: Token price rises by X% (requires: token, threshold_percent)
-- volume_spike: Trading volume increases X% (requires: token, threshold_percent)
+- price_drop: Token price drops by X% (requires: token, threshold)
+- price_rise: Token price rises by X% (requires: token, threshold)
+- volume_spike: Trading volume increases X% (requires: token, threshold)
 - price_level: Price crosses above/below X (requires: token, price, direction)
 
 Output ONLY valid JSON with this schema:
@@ -71,18 +71,17 @@ Output ONLY valid JSON with this schema:
     "conditions": [
         {
             "type": "price_drop|price_rise|volume_spike|price_level",
-            "params": {
-                "token": "TOKEN_SYMBOL",
-                "threshold_percent": number,  // for price_drop, price_rise, volume_spike
-                "price": number,              // for price_level
-                "direction": "above|below"    // for price_level
-            }
+            "token": "TOKEN_SYMBOL",
+            "chain": "bsc",
+            "threshold": number,  // for price_drop, price_rise, volume_spike
+            "price": number,     // for price_level
+            "direction": "above|below",  // for price_level
+            "timeframe": "1h"
         }
     ],
     "actions": [
         {
-            "type": "buy|sell|notify",
-            "params": {}
+            "type": "buy|sell|notify"
         }
     ]
 }

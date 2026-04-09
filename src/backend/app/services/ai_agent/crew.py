@@ -33,29 +33,24 @@ class StrategyValidator:
                 errors.append(f"Condition {i}: unsupported type '{cond_type}'")
                 continue
 
-            params = condition.get("params", {})
             if cond_type in ["price_drop", "price_rise", "volume_spike"]:
-                if "token" not in params:
+                if "token" not in condition:
                     errors.append(f"Condition {i}: missing 'token'")
-                if "threshold_percent" not in params:
-                    errors.append(f"Condition {i}: missing 'threshold_percent'")
-                elif not isinstance(params["threshold_percent"], (int, float)):
-                    errors.append(
-                        f"Condition {i}: 'threshold_percent' must be a number"
-                    )
-                elif params["threshold_percent"] <= 0:
-                    errors.append(
-                        f"Condition {i}: 'threshold_percent' must be positive"
-                    )
+                if "threshold" not in condition:
+                    errors.append(f"Condition {i}: missing 'threshold'")
+                elif not isinstance(condition["threshold"], (int, float)):
+                    errors.append(f"Condition {i}: 'threshold' must be a number")
+                elif condition["threshold"] <= 0:
+                    errors.append(f"Condition {i}: 'threshold' must be positive")
 
             elif cond_type == "price_level":
-                if "token" not in params:
+                if "token" not in condition:
                     errors.append(f"Condition {i}: missing 'token'")
-                if "price" not in params:
+                if "price" not in condition:
                     errors.append(f"Condition {i}: missing 'price'")
-                if "direction" not in params:
+                if "direction" not in condition:
                     errors.append(f"Condition {i}: missing 'direction'")
-                elif params["direction"] not in ["above", "below"]:
+                elif condition["direction"] not in ["above", "below"]:
                     errors.append(
                         f"Condition {i}: direction must be 'above' or 'below'"
                     )
@@ -85,23 +80,22 @@ class StrategyExplainer:
                 explanations.append("This strategy will trigger when:")
                 for cond in cond_list:
                     cond_type = cond.get("type")
-                    params = cond.get("params", {})
-                    token = params.get("token", "the token")
+                    token = cond.get("token", "the token")
 
                     if cond_type == "price_drop":
-                        pct = params.get("threshold_percent", 0)
+                        pct = cond.get("threshold", 0)
                         explanations.append(f"  - {token} price drops by {pct}%")
                     elif cond_type == "price_rise":
-                        pct = params.get("threshold_percent", 0)
+                        pct = cond.get("threshold", 0)
                         explanations.append(f"  - {token} price rises by {pct}%")
                     elif cond_type == "volume_spike":
-                        pct = params.get("threshold_percent", 0)
+                        pct = cond.get("threshold", 0)
                         explanations.append(
                             f"  - {token} trading volume increases by {pct}%"
                         )
                     elif cond_type == "price_level":
-                        price = params.get("price", 0)
-                        direction = params.get("direction", "unknown")
+                        price = cond.get("price", 0)
+                        direction = cond.get("direction", "unknown")
                         explanations.append(
                             f"  - {token} price crosses {direction} ${price}"
                         )
