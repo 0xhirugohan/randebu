@@ -20,10 +20,15 @@ class BacktestEngine:
         self.strategy_config = config.get("strategy_config", {})
         self.conditions = self.strategy_config.get("conditions", [])
         self.actions = self.strategy_config.get("actions", [])
+        self.risk_management = self.strategy_config.get("risk_management", {})
+        self.stop_loss_percent = self.risk_management.get("stop_loss_percent")
+        self.take_profit_percent = self.risk_management.get("take_profit_percent")
         self.initial_balance = config.get("initial_balance", 10000.0)
         self.current_balance = self.initial_balance
         self.position = 0.0
         self.position_token = ""
+        self.entry_price: Optional[float] = None
+        self.entry_time: Optional[int] = None
         self.trades: List[Dict[str, Any]] = []
         self.running = False
 
@@ -103,10 +108,72 @@ class BacktestEngine:
 
             timestamp = kline.get("timestamp", 0)
 
+            if self.position > 0 and self.entry_price is not None:
+                exit_info = self._check_risk_management(price, timestamp)
+                if exit_info:
+                    await self._execute_risk_exit(price, timestamp, exit_info)
+                    continue
+
             for condition in self.conditions:
                 if self._check_condition(condition, klines, i, price):
                     await self._execute_actions(price, timestamp, condition)
                     break
+
+    def _check_risk_management(
+        self, current_price: float, timestamp: int
+    ) -> Optional[Dict[str, Any]]:
+        if self.position <= 0 or self.entry_price is None:
+            return None
+
+        if self.stop_loss_percent is not None:
+            stop_loss_price = self.entry_price * (1 - self.stop_loss_percent / 100)
+            if current_price <= stop_loss_price:
+                return {"reason": "stop_loss", "price": stop_loss_price}
+
+        if self.take_profit_percent is not None:
+            take_profit_price = self.entry_price * (1 + self.take_profit_percent / 100)
+            if current_price >= take_profit_price:
+                return {"reason": "take_profit", "price": take_profit_price}
+
+        return None
+
+    async def _execute_risk_exit(
+        self, price: float, timestamp: int, exit_info: Dict[str, Any]
+    ):
+        if self.position <= 0:
+            return
+
+        reason = exit_info["reason"]
+        sell_amount = self.position * price
+        self.current_balance += sell_amount
+        self.trades.append(
+            {
+                "type": "sell",
+                "token": self.position_token,
+                "price": price,
+                "amount": sell_amount,
+                "quantity": self.position,
+                "timestamp": timestamp,
+                "exit_reason": reason,
+            }
+        )
+        self.signals.append(
+            {
+                "id": str(uuid.uuid4()),
+                "bot_id": self.bot_id,
+                "run_id": self.run_id,
+                "signal_type": "sell",
+                "token": self.position_token,
+                "price": price,
+                "confidence": 1.0,
+                "reasoning": f"Risk management triggered {reason}",
+                "executed": False,
+                "created_at": datetime.utcnow(),
+            }
+        )
+        self.position = 0
+        self.entry_price = None
+        self.entry_time = None
 
     def _check_condition(
         self,
@@ -173,6 +240,8 @@ class BacktestEngine:
                 self.position += amount / price
                 self.current_balance -= amount
                 self.position_token = token
+                self.entry_price = price
+                self.entry_time = timestamp
                 self.trades.append(
                     {
                         "type": "buy",
@@ -209,9 +278,12 @@ class BacktestEngine:
                         "amount": sell_amount,
                         "quantity": self.position,
                         "timestamp": timestamp,
+                        "exit_reason": "manual",
                     }
                 )
                 self.position = 0
+                self.entry_price = None
+                self.entry_time = None
                 self.signals.append(
                     {
                         "id": str(uuid.uuid4()),
