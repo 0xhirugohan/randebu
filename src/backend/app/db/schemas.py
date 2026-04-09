@@ -35,8 +35,8 @@ class UserSettingsUpdate(BaseModel):
 class BotCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    strategy_config: dict
-    llm_config: dict
+    strategy_config: Optional[dict] = {}
+    llm_config: Optional[dict] = {}
 
 
 class BotUpdate(BaseModel):
