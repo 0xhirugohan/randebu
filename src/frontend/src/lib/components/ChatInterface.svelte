@@ -6,8 +6,6 @@
 	interface Props {
 		bot: Bot | null;
 		messages: ChatMessage[];
-		isThinking?: boolean;
-		thinkingContent?: string;
 		onSendMessage: (message: string) => void;
 		onSelectBot?: (botId: string) => void;
 		availableBots?: Bot[];
@@ -17,8 +15,6 @@
 	let {
 		bot,
 		messages,
-		isThinking = false,
-		thinkingContent = '',
 		onSendMessage,
 		onSelectBot,
 		availableBots = [],
@@ -27,13 +23,12 @@
 
 	let messageInput = $state('');
 	let chatContainer: HTMLDivElement;
-	let showThinking = $state(false);
+	let expandedThinking: Record<string, boolean> = $state({});
 
 	function handleSend() {
 		if (!messageInput.trim()) return;
 		onSendMessage(messageInput);
 		messageInput = '';
-		showThinking = false;
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -50,8 +45,8 @@
 		}
 	}
 
-	function toggleThinking() {
-		showThinking = !showThinking;
+	function toggleThinkingExpand(messageId: string) {
+		expandedThinking[messageId] = !expandedThinking[messageId];
 	}
 
 	$effect(() => {
@@ -59,13 +54,6 @@
 			setTimeout(() => {
 				chatContainer.scrollTop = chatContainer.scrollHeight;
 			}, 50);
-		}
-	});
-
-	// Watch for thinking state changes
-	$effect(() => {
-		if (isThinking && thinkingContent) {
-			showThinking = true;
 		}
 	});
 
@@ -89,7 +77,7 @@
 	{/if}
 
 	<div class="chat-messages" bind:this={chatContainer}>
-		{#if messages.length === 0 && !isThinking}
+		{#if messages.length === 0}
 			<div class="welcome-message">
 				<p>Welcome to {bot?.name || 'your bot'}! Describe your trading strategy in plain English.</p>
 				<p class="hint">Example: "Buy PEPE when the price drops by 5% within 1 hour"</p>
@@ -98,6 +86,24 @@
 
 		{#each messages as message}
 			<div class="message {message.role}">
+				{#if message.role === 'assistant' && message.thinking}
+					{@const firstLine = message.thinking.split('\n')[0]}
+					{@const isExpanded = expandedThinking[message.id] ?? false}
+					<div class="thinking-section">
+						<button class="thinking-toggle" onclick={() => toggleThinkingExpand(message.id)}>
+							<span class="thinking-icon">{isExpanded ? '▼' : '▶'}</span>
+							<span class="thinking-label">{isExpanded ? 'Hide reasoning' : 'Show reasoning'}</span>
+							{#if !isExpanded}
+								<span class="thinking-preview"> — {firstLine.slice(0, 60)}{firstLine.length > 60 ? '...' : ''}</span>
+							{/if}
+						</button>
+						{#if isExpanded}
+							<div class="thinking-content">
+								{message.thinking}
+							</div>
+						{/if}
+					</div>
+				{/if}
 				<div class="message-content">
 					{#each renderContent(message.content) as segment}
 						{#if segment.type === 'bold'}
@@ -125,51 +131,7 @@
 					{message.timestamp.toLocaleTimeString()}
 				</div>
 			</div>
-		{/each}
-
-		{#if isThinking}
-			<div class="message assistant thinking">
-				<div class="message-content">
-					{#if thinkingContent}
-						<div class="thinking-header">
-							<button class="thinking-toggle" onclick={toggleThinking}>
-								<span class="thinking-icon">{showThinking ? '▼' : '▶'}</span>
-								<span class="thinking-label">Thinking</span>
-							</button>
-						</div>
-						{#if showThinking}
-							<div class="thinking-content">
-								{#each renderContent(thinkingContent) as segment}
-									{#if segment.type === 'bold'}
-										<strong>{segment.content}</strong>
-									{:else if segment.type === 'italic'}
-										<em>{segment.content}</em>
-									{:else if segment.type === 'code'}
-										<code class="inline-code">{segment.content}</code>
-									{:else if segment.type === 'codeBlock'}
-										<pre class="code-block"><code>{segment.content}</code></pre>
-									{:else if segment.type === 'list' && segment.items}
-										<ul>
-											{#each segment.items as item}
-												<li>{item}</li>
-											{/each}
-										</ul>
-									{:else}
-										{segment.content}
-									{/if}
-								{/each}
-							</div>
-						{/if}
-					{:else}
-						<div class="typing">
-							<span class="dot"></span>
-							<span class="dot"></span>
-							<span class="dot"></span>
-						</div>
-					{/if}
-				</div>
-			</div>
-		{/if}
+	{/each}
 	</div>
 
 	{#if bot}
@@ -179,9 +141,8 @@
 				onkeydown={handleKeydown}
 				placeholder="Describe your trading strategy..."
 				rows="1"
-				disabled={isThinking}
 			></textarea>
-			<button onclick={handleSend} disabled={isThinking || !messageInput.trim()}>
+			<button onclick={handleSend}>
 				Send
 			</button>
 		</div>
@@ -278,6 +239,64 @@
 	.message.assistant .message-content {
 		background: rgba(255, 255, 255, 0.1);
 		border-bottom-left-radius: 4px;
+	}
+
+	.thinking-section {
+		margin-bottom: 0.5rem;
+		padding: 0.5rem 0.75rem;
+		background: rgba(255, 255, 255, 0.03);
+		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.thinking-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		background: none;
+		border: none;
+		color: #888;
+		cursor: pointer;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.8rem;
+		transition: background 0.2s;
+		width: 100%;
+		text-align: left;
+	}
+
+	.thinking-toggle:hover {
+		background: rgba(255, 255, 255, 0.1);
+	}
+
+	.thinking-icon {
+		font-size: 0.6rem;
+		color: #667eea;
+	}
+
+	.thinking-label {
+		font-weight: 500;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		color: #667eea;
+	}
+
+	.thinking-preview {
+		color: #666;
+		font-style: italic;
+		font-weight: normal;
+		text-transform: none;
+		letter-spacing: normal;
+	}
+
+	.thinking-content {
+		color: #888;
+		font-size: 0.85rem;
+		padding: 0.75rem 0.5rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+		margin-top: 0.5rem;
+		white-space: pre-wrap;
+		line-height: 1.6;
 	}
 
 	.message.system .message-content {

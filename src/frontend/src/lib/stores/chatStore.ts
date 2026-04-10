@@ -5,6 +5,7 @@ export interface ChatMessage {
 	id: string;
 	role: 'user' | 'assistant' | 'system';
 	content: string;
+	thinking: string | null;
 	timestamp: Date;
 }
 
@@ -37,6 +38,7 @@ export function setMessages(messages: BotConversation[]) {
 		id: m.id,
 		role: m.role,
 		content: m.content,
+		thinking: null,
 		timestamp: new Date(m.created_at)
 	})));
 }
