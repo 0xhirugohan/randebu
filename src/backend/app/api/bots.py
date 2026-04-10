@@ -16,6 +16,7 @@ from ..db.schemas import (
 )
 from ..db.models import Bot, BotConversation, User
 from ..services.ai_agent.crew import get_trading_crew
+from ..services.ai_agent.conversational import get_conversational_agent
 
 router = APIRouter()
 MAX_BOTS_PER_USER = 3
@@ -183,69 +184,45 @@ def chat(
         .order_by(BotConversation.created_at)
         .all()
     )
-    history_for_crew = [
+    history_for_agent = [
         {"role": conv.role, "content": conv.content}
         for conv in conversation_history[-10:]
     ]
 
     user_message = request.message
-    if request.strategy_config:
-        crew = get_trading_crew()
-        result = crew.chat(user_message, history_for_crew)
+    
+    # Use ConversationalAgent for natural chat with tool-calling
+    agent = get_conversational_agent(bot_id=bot_id)
+    result = agent.chat(user_message, history_for_agent)
 
-        assistant_content = result.get("response", "I couldn't process your request.")
-        if result.get("success") and result.get("strategy_config"):
-            bot.strategy_config = result["strategy_config"]
-            db.commit()
+    assistant_content = result.get("response", "I couldn't process your request.")
 
-        db_conversation = BotConversation(
-            bot_id=bot_id,
-            role="user",
-            content=user_message,
-        )
-        db.add(db_conversation)
+    # Save conversation
+    db_conversation = BotConversation(
+        bot_id=bot_id,
+        role="user",
+        content=user_message,
+    )
+    db.add(db_conversation)
 
-        db_assistant = BotConversation(
-            bot_id=bot_id,
-            role="assistant",
-            content=assistant_content,
-        )
-        db.add(db_assistant)
-        db.commit()
-        db.refresh(db_assistant)
+    db_assistant = BotConversation(
+        bot_id=bot_id,
+        role="assistant",
+        content=assistant_content,
+    )
+    db.add(db_assistant)
+    db.commit()
+    db.refresh(db_assistant)
 
-        return BotChatResponse(
-            response=assistant_content,
-            strategy_config=result.get("strategy_config"),
-            success=result.get("success", False),
-        )
-    else:
-        crew = get_trading_crew()
-        result = crew.chat(user_message, history_for_crew)
+    # If strategy was updated via tool, refresh bot data
+    if result.get("strategy_updated"):
+        db.refresh(bot)
 
-        assistant_content = result.get("response", "I couldn't process your request.")
-
-        db_conversation = BotConversation(
-            bot_id=bot_id,
-            role="user",
-            content=user_message,
-        )
-        db.add(db_conversation)
-
-        db_assistant = BotConversation(
-            bot_id=bot_id,
-            role="assistant",
-            content=assistant_content,
-        )
-        db.add(db_assistant)
-        db.commit()
-        db.refresh(db_assistant)
-
-        return BotChatResponse(
-            response=assistant_content,
-            strategy_config=result.get("strategy_config"),
-            success=result.get("success", False),
-        )
+    return BotChatResponse(
+        response=assistant_content,
+        strategy_config=bot.strategy_config if result.get("strategy_updated") else None,
+        success=result.get("success", False),
+    )
 
 
 @router.get("/{bot_id}/history", response_model=List[BotConversationResponse])
