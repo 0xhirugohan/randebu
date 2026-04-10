@@ -31,6 +31,8 @@ class BacktestEngine:
         self.entry_time: Optional[int] = None
         self.trades: List[Dict[str, Any]] = []
         self.running = False
+        self.progress = 0
+        self.total_klines = 0
 
     async def run(self) -> Dict[str, Any]:
         self.running = True
@@ -98,9 +100,12 @@ class BacktestEngine:
         return self.results
 
     async def _process_klines(self, klines: List[Dict[str, Any]]):
+        self.total_klines = len(klines)
         for i, kline in enumerate(klines):
             if not self.running:
                 break
+
+            self.progress = int((i / self.total_klines) * 100) if self.total_klines > 0 else 0
 
             price = float(kline.get("close", 0))
             if price <= 0:
@@ -384,6 +389,8 @@ class BacktestEngine:
 
     async def stop(self):
         self.running = False
+        self.progress = 0
+        self.total_klines = 0
         self.status = "stopped"
         self._calculate_metrics()
 
@@ -393,4 +400,13 @@ class BacktestEngine:
             "status": self.status,
             "results": self.results,
             "signals": self.signals,
+            "progress": self.progress,
+            "total_klines": self.total_klines,
+        }
+
+    def get_status(self) -> Dict[str, Any]:
+        return {
+            "status": self.status,
+            "progress": self.progress,
+            "total_klines": self.total_klines,
         }

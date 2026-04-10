@@ -90,6 +90,7 @@ class BacktestResponse(BaseModel):
     status: str
     config: dict
     result: Optional[dict]
+    progress: Optional[int] = None
 
     class Config:
         from_attributes = True

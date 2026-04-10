@@ -62,9 +62,10 @@ export interface Backtest {
 	bot_id: string;
 	started_at: string;
 	ended_at: string | null;
-	status: 'running' | 'completed' | 'failed';
+	status: 'running' | 'completed' | 'failed' | 'stopped';
 	config: BacktestConfig;
 	result: BacktestResult | null;
+	progress?: number;
 }
 
 export interface BacktestConfig {

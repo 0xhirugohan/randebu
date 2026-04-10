@@ -33,12 +33,12 @@
 			await loadBot();
 			await loadBacktests();
 			
-			// Poll for backtest updates every 5 seconds if any are running
+			// Poll for backtest updates every 2 seconds if any are running
 			const pollInterval = setInterval(async () => {
 				if ($backtestStore.backtestHistory.some(b => b.status === 'running')) {
 					await loadBacktests();
 				}
-			}, 5000);
+			}, 2000);
 			
 			return () => clearInterval(pollInterval);
 		}
@@ -201,6 +201,12 @@
 								</div>
 							{/if}
 							{#if backtest.status === 'running'}
+								<div class="progress-container">
+									<div class="progress-bar">
+										<div class="progress-fill" style="width: {backtest.progress ?? 0}%"></div>
+									</div>
+									<span class="progress-text">{backtest.progress ?? 0}%</span>
+								</div>
 								<button onclick={() => stopBacktest(backtest.id)} class="btn btn-danger">Stop</button>
 							{/if}
 						</div>
@@ -400,6 +406,11 @@
 		color: #fca5a5;
 	}
 
+	.status-stopped {
+		background: rgba(251, 191, 36, 0.2);
+		color: #fbbf24;
+	}
+
 	.backtest-date {
 		color: #888;
 		font-size: 0.85rem;
@@ -433,6 +444,33 @@
 
 	.negative {
 		color: #ef4444;
+	}
+
+	.progress-container {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.progress-bar {
+		flex: 1;
+		height: 8px;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.progress-fill {
+		height: 100%;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		transition: width 0.3s ease;
+	}
+
+	.progress-text {
+		font-size: 0.85rem;
+		color: #888;
+		min-width: 40px;
 	}
 
 	.btn-danger {

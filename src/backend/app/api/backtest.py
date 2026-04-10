@@ -169,6 +169,11 @@ def get_backtest(
             status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found"
         )
 
+    # Add progress from running engine if available
+    if backtest.status == "running" and run_id in running_backtests:
+        engine = running_backtests[run_id]
+        backtest.progress = engine.progress
+    
     return backtest
 
 
@@ -226,7 +231,12 @@ def stop_backtest(
 
     if run_id in running_backtests:
         engine = running_backtests[run_id]
-        asyncio.create_task(engine.stop())
+        engine.running = False  # Direct sync access to running flag
+        backtest.status = "stopped"
+        backtest.ended_at = datetime.utcnow()
+        db.commit()
+    elif backtest.status == "running":
+        # Engine already finished but status not updated
         backtest.status = "stopped"
         backtest.ended_at = datetime.utcnow()
         db.commit()
