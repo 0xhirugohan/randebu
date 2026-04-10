@@ -132,4 +132,12 @@ export interface BotChatResponse {
 	success: boolean;
 	strategy_needs_confirmation?: boolean;
 	strategy_data?: StrategyConfig | null;
+	token_search_results?: TokenSearchResult[] | null;
+}
+
+export interface TokenSearchResult {
+	symbol: string;
+	name: string;
+	address: string;
+	chain: string;
 }

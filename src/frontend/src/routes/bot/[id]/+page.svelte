@@ -5,6 +5,7 @@
 	import { isAuthenticated, isLoading, chatStore, addMessage, setMessages, clearChat, currentBotStore, setCurrentBot } from '$lib/stores';
 	import { api } from '$lib/api';
 	import { ChatInterface, StrategyPreview } from '$lib/components';
+	import type { TokenSearchResult } from '$lib/api';
 
 	let botId = $derived($page.params.id);
 	let isSending = $state(false);
@@ -15,6 +16,7 @@
 	let pendingStrategyData = $state<any>(null);
 	let tokenAddressInput = $state('');
 	let confirmingMessage = $state('');
+	let tokenSearchResults = $state<TokenSearchResult[]>([]);
 
 	onMount(async () => {
 		if (!$isAuthenticated && !$isLoading) {
@@ -67,6 +69,7 @@
 				pendingStrategyData = response.strategy_data;
 				confirmingMessage = response.response;
 				tokenAddressInput = '';
+				tokenSearchResults = response.token_search_results || [];
 				showTokenConfirm = true;
 			}
 			
@@ -134,12 +137,18 @@
 		showTokenConfirm = false;
 		pendingStrategyData = null;
 		tokenAddressInput = '';
+		tokenSearchResults = [];
+	}
+	
+	function selectTokenResult(result: TokenSearchResult) {
+		tokenAddressInput = result.address;
 	}
 	
 	function cancelTokenConfirm() {
 		showTokenConfirm = false;
 		pendingStrategyData = null;
 		tokenAddressInput = '';
+		tokenSearchResults = [];
 	}
 </script>
 
@@ -151,9 +160,23 @@
 	{#if showTokenConfirm}
 		<div class="modal-overlay" onclick={cancelTokenConfirm}>
 			<div class="modal-content" onclick={(e) => e.stopPropagation()}>
-				<h3>Confirm Token Address</h3>
+				<h3>Select Token Address</h3>
 				<p class="modal-message">{confirmingMessage}</p>
-				<p class="modal-hint">Please enter the BSC contract address for the token:</p>
+				
+				{#if tokenSearchResults.length > 0}
+					<div class="token-results">
+						<p class="modal-hint">Select a token:</p>
+						{#each tokenSearchResults as result}
+							<button class="token-result" onclick={() => selectTokenResult(result)}>
+								<span class="token-symbol">{result.symbol}</span>
+								<span class="token-name">{result.name}</span>
+								<span class="token-address">{result.address.slice(0, 10)}...{result.address.slice(-8)}</span>
+							</button>
+						{/each}
+					</div>
+					<p class="modal-divider">or enter manually:</p>
+				{/if}
+				
 				<input type="text" class="token-input" bind:value={tokenAddressInput} placeholder="0x..."/>
 				<div class="modal-actions">
 					<button class="btn btn-secondary" onclick={cancelTokenConfirm}>Cancel</button>
@@ -362,5 +385,62 @@
 	.btn-primary:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* Token Results */
+	.token-results {
+		max-height: 200px;
+		overflow-y: auto;
+		margin-bottom: 1rem;
+	}
+
+	.token-result {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.75rem;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 8px;
+		margin-bottom: 0.5rem;
+		cursor: pointer;
+		text-align: left;
+		color: #fff;
+		transition: background 0.2s;
+	}
+
+	.token-result:hover {
+		background: rgba(102, 126, 234, 0.2);
+		border-color: rgba(102, 126, 234, 0.5);
+	}
+
+	.token-result:last-child {
+		margin-bottom: 0;
+	}
+
+	.token-symbol {
+		font-weight: 600;
+		color: #667eea;
+		min-width: 60px;
+	}
+
+	.token-name {
+		flex: 1;
+		color: #ccc;
+		font-size: 0.9rem;
+	}
+
+	.token-address {
+		font-size: 0.75rem;
+		color: #666;
+		font-family: 'Monaco', 'Menlo', monospace;
+	}
+
+	.modal-divider {
+		text-align: center;
+		color: #666;
+		font-size: 0.85rem;
+		margin: 1rem 0;
 	}
 </style>

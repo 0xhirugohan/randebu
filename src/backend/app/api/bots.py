@@ -225,6 +225,7 @@ def chat(
         success=result.get("success", False),
         strategy_needs_confirmation=result.get("strategy_needs_confirmation", False),
         strategy_data=result.get("strategy_data") if result.get("strategy_needs_confirmation") else None,
+        token_search_results=result.get("token_search_results"),
     )
 
 

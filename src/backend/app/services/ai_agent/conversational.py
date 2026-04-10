@@ -165,11 +165,42 @@ class ConversationalAgent:
             
             # Check if token_address is missing in strategy_update
             strategy_needs_confirmation = False
+            token_search_results = None
+            
             if strategy_update:
+                # Extract token name from conditions
+                token_name = None
                 for cond in strategy_update.get("conditions", []):
-                    if not cond.get("token_address"):
+                    if not cond.get("token_address") and cond.get("token"):
+                        token_name = cond.get("token")
                         strategy_needs_confirmation = True
                         break
+                
+                # Search for token if name is found
+                if strategy_needs_confirmation and token_name:
+                    try:
+                        from ..ave.client import AveCloudClient
+                        from ...core.config import get_settings
+                        settings = get_settings()
+                        ave_client = AveCloudClient(
+                            api_key=settings.AVE_API_KEY,
+                            plan=settings.AVE_API_PLAN
+                        )
+                        # Run async search in sync context
+                        import asyncio
+                        tokens = asyncio.run(ave_client.get_tokens(query=token_name, chain="bsc", limit=5))
+                        if tokens:
+                            token_search_results = [
+                                {
+                                    "symbol": t.get("symbol", ""),
+                                    "name": t.get("name", ""),
+                                    "address": t.get("id") or t.get("contract_address", ""),
+                                    "chain": t.get("chain", "bsc")
+                                }
+                                for t in tokens
+                            ]
+                    except Exception as e:
+                        print(f"Token search error: {e}")
             
             # Only update strategy if token_address is provided
             if strategy_update and strategy_needs_confirmation:
@@ -181,6 +212,7 @@ class ConversationalAgent:
                     "strategy_updated": False,
                     "strategy_needs_confirmation": True,
                     "strategy_data": strategy_update,
+                    "token_search_results": token_search_results,
                     "success": True
                 }
             

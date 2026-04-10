@@ -151,6 +151,7 @@ class BotChatResponse(BaseModel):
     success: bool = False
     strategy_needs_confirmation: Optional[bool] = False
     strategy_data: Optional[dict] = None
+    token_search_results: Optional[List[dict]] = None
 
 
 class SignalResponse(BaseModel):
