@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import Annotated
 
@@ -14,6 +14,7 @@ from ..core.config import get_settings
 from ..core.limiter import limiter
 from ..db.schemas import (
     UserCreate,
+    LoginRequest,
     UserResponse,
     Token,
     UserSettings,
@@ -85,11 +86,11 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 @limiter.limit("5/minute")
 def login(
     request: Request,
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    login_data: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter(User.email == form_data.username).first()
-    if not user or not verify_password(form_data.password, user.password_hash):
+    user = db.query(User).filter(User.email == login_data.username).first()
+    if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
