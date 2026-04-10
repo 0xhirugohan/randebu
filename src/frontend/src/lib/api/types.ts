@@ -130,4 +130,6 @@ export interface BotChatResponse {
 	thinking: string | null;
 	strategy_config: StrategyConfig | null;
 	success: boolean;
+	strategy_needs_confirmation?: boolean;
+	strategy_data?: StrategyConfig | null;
 }

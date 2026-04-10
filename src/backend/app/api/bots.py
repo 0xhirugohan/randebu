@@ -223,6 +223,8 @@ def chat(
         thinking=result.get("thinking"),
         strategy_config=bot.strategy_config if result.get("strategy_updated") else None,
         success=result.get("success", False),
+        strategy_needs_confirmation=result.get("strategy_needs_confirmation", False),
+        strategy_data=result.get("strategy_data") if result.get("strategy_needs_confirmation") else None,
     )
 
 

@@ -9,6 +9,12 @@
 	let botId = $derived($page.params.id);
 	let isSending = $state(false);
 	let showStrategy = $state(false);
+	
+	// Token address confirmation modal state
+	let showTokenConfirm = $state(false);
+	let pendingStrategyData = $state<any>(null);
+	let tokenAddressInput = $state('');
+	let confirmingMessage = $state('');
 
 	onMount(async () => {
 		if (!$isAuthenticated && !$isLoading) {
@@ -55,6 +61,15 @@
 			const response = await api.bots.chat(botId, message, controller.signal);
 			clearTimeout(timeoutId);
 			
+			// Check if token address confirmation is needed
+			if (response.strategy_needs_confirmation && response.strategy_data) {
+				// Show token confirmation modal
+				pendingStrategyData = response.strategy_data;
+				confirmingMessage = response.response;
+				tokenAddressInput = '';
+				showTokenConfirm = true;
+			}
+			
 			// Add assistant response with thinking
 			addMessage({ role: 'assistant', content: response.response, thinking: response.thinking || null });
 			
@@ -76,6 +91,56 @@
 	function toggleStrategy() {
 		showStrategy = !showStrategy;
 	}
+	
+	async function confirmTokenAddress() {
+		if (!tokenAddressInput.trim() || !pendingStrategyData) {
+			showTokenConfirm = false;
+			return;
+		}
+		
+		// Update the pending strategy with the token address
+		const updatedStrategy = { ...pendingStrategyData };
+		
+		// Update conditions with token address
+		if (updatedStrategy.conditions) {
+			updatedStrategy.conditions = updatedStrategy.conditions.map((cond: any) => ({
+				...cond,
+				token_address: tokenAddressInput.trim()
+			}));
+		}
+		
+		// Update actions with token address
+		if (updatedStrategy.actions) {
+			updatedStrategy.actions = updatedStrategy.actions.map((action: any) => ({
+				...action,
+				token_address: tokenAddressInput.trim()
+			}));
+		}
+		
+		try {
+			// Update bot with the strategy
+			await api.bots.update(botId, { strategy_config: updatedStrategy });
+			
+			// Refresh bot data
+			const bot = await api.bots.get(botId);
+			setCurrentBot(bot);
+			
+			// Add success message
+			addMessage({ role: 'assistant', content: `Perfect! I've saved your strategy with the token address. You can now run backtests!`, thinking: null });
+		} catch (e) {
+			addMessage({ role: 'assistant', content: 'Failed to save strategy. Please try again.', thinking: null });
+		}
+		
+		showTokenConfirm = false;
+		pendingStrategyData = null;
+		tokenAddressInput = '';
+	}
+	
+	function cancelTokenConfirm() {
+		showTokenConfirm = false;
+		pendingStrategyData = null;
+		tokenAddressInput = '';
+	}
 </script>
 
 <svelte:head>
@@ -83,6 +148,20 @@
 </svelte:head>
 
 <main>
+	{#if showTokenConfirm}
+		<div class="modal-overlay" onclick={cancelTokenConfirm}>
+			<div class="modal-content" onclick={(e) => e.stopPropagation()}>
+				<h3>Confirm Token Address</h3>
+				<p class="modal-message">{confirmingMessage}</p>
+				<p class="modal-hint">Please enter the BSC contract address for the token:</p>
+				<input type="text" class="token-input" bind:value={tokenAddressInput} placeholder="0x..."/>
+				<div class="modal-actions">
+					<button class="btn btn-secondary" onclick={cancelTokenConfirm}>Cancel</button>
+					<button class="btn btn-primary" onclick={confirmTokenAddress} disabled={!tokenAddressInput.trim()}>Confirm</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 	<header>
 		<div class="header-left">
 			<a href="/dashboard" class="back-link">← Dashboard</a>
@@ -199,5 +278,89 @@
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Modal Styles */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
+
+	.modal-content {
+		background: rgba(20, 20, 20, 0.95);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 16px;
+		padding: 1.5rem;
+		max-width: 450px;
+		width: 90%;
+	}
+
+	.modal-content h3 {
+		margin: 0 0 1rem;
+		color: #667eea;
+	}
+
+	.modal-message {
+		color: #ccc;
+		margin-bottom: 0.5rem;
+		line-height: 1.5;
+	}
+
+	.modal-hint {
+		color: #888;
+		font-size: 0.9rem;
+		margin-bottom: 1rem;
+	}
+
+	.token-input {
+		width: 100%;
+		padding: 0.75rem;
+		border-radius: 8px;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		background: rgba(255, 255, 255, 0.05);
+		color: #fff;
+		font-size: 1rem;
+		font-family: 'Monaco', 'Menlo', monospace;
+		box-sizing: border-box;
+	}
+
+	.token-input:focus {
+		outline: none;
+		border-color: #667eea;
+	}
+
+	.modal-actions {
+		display: flex;
+		gap: 0.75rem;
+		margin-top: 1rem;
+		justify-content: flex-end;
+	}
+
+	.btn-primary {
+		padding: 0.75rem 1.5rem;
+		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-size: 1rem;
+		font-weight: 500;
+		cursor: pointer;
+	}
+
+	.btn-primary:hover:not(:disabled) {
+		transform: translateY(-2px);
+	}
+
+	.btn-primary:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 </style>

@@ -16,14 +16,15 @@
 	let selectedBacktest = $state<Backtest | null>(null);
 
 	onMount(async () => {
-		// Set default dates (yesterday to 30 days ago)
+		// Set default dates - yesterday only (1 day range for fast testing)
 		const yesterday = new Date();
 		yesterday.setDate(yesterday.getDate() - 1);
-		const thirtyDaysAgo = new Date();
-		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 		
-		endDate = yesterday.toISOString().split('T')[0];
-		startDate = thirtyDaysAgo.toISOString().split('T')[0];
+		// Set max date to yesterday
+		const maxDate = yesterday.toISOString().split('T')[0];
+		
+		endDate = maxDate;
+		startDate = maxDate;  // Same day = 1 day backtest
 		
 		if (!$isAuthenticated && !$isLoading) {
 			goto('/login');
@@ -55,6 +56,17 @@
 
 	async function startBacktest() {
 		if (!startDate || !endDate) return;
+		
+		// Validate date range (max 7 days)
+		const start = new Date(startDate);
+		const end = new Date(endDate);
+		const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+		
+		if (daysDiff > 7) {
+			setBacktestError('Maximum backtest duration is 7 days for fast testing');
+			return;
+		}
+		
 		setBacktestError(null);
 		setBacktestLoading(true);
 		isRunning = true;
@@ -125,10 +137,10 @@
 					<div class="field">
 						<label for="timeframe">Timeframe</label>
 						<select id="timeframe" bind:value={timeframe}>
-							<option value="1m">1 minute</option>
-							<option value="5m">5 minutes</option>
-							<option value="15m">15 minutes</option>
-							<option value="1h">1 hour</option>
+							
+							
+							
+							<option value="1h">1 hour (recommended)</option>
 							<option value="4h">4 hours</option>
 							<option value="1d">1 day</option>
 						</select>

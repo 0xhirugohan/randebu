@@ -149,6 +149,8 @@ class BotChatResponse(BaseModel):
     thinking: Optional[str] = None
     strategy_config: Optional[dict] = None
     success: bool = False
+    strategy_needs_confirmation: Optional[bool] = False
+    strategy_data: Optional[dict] = None
 
 
 class SignalResponse(BaseModel):
