@@ -32,6 +32,15 @@
 		if ($isAuthenticated && botId) {
 			await loadBot();
 			await loadBacktests();
+			
+			// Poll for backtest updates every 5 seconds if any are running
+			const pollInterval = setInterval(async () => {
+				if ($backtestStore.backtestHistory.some(b => b.status === 'running')) {
+					await loadBacktests();
+				}
+			}, 5000);
+			
+			return () => clearInterval(pollInterval);
 		}
 	});
 
@@ -90,7 +99,7 @@
 	}
 
 	function selectBacktest(backtest: Backtest) {
-		if (backtest.status === 'completed' && backtest.result) {
+		if (backtest.status === 'completed' && backtest.result && !backtest.result.error) {
 			selectedBacktest = backtest;
 		}
 	}
@@ -165,7 +174,11 @@
 								<span class="backtest-status status-{backtest.status}">{backtest.status}</span>
 								<span class="backtest-date">{new Date(backtest.started_at).toLocaleDateString()}</span>
 							</div>
-							{#if backtest.result}
+							{#if backtest.result && backtest.result.error}
+							<div class="backtest-error">
+								<span class="error-label">Error:</span> {typeof backtest.result.error === 'string' ? backtest.result.error : JSON.stringify(backtest.result.error)}
+							</div>
+						{:else if backtest.result}
 								<div class="backtest-results">
 									<div class="result-item">
 										<span class="result-label">Total Return</span>
@@ -269,6 +282,20 @@
 		border-radius: 8px;
 		margin-bottom: 1rem;
 		font-size: 0.9rem;
+	}
+
+	.backtest-error {
+		background: rgba(239, 68, 68, 0.1);
+		border: 1px solid rgba(239, 68, 68, 0.3);
+		color: #fca5a5;
+		padding: 0.75rem;
+		border-radius: 8px;
+		font-size: 0.85rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.error-label {
+		font-weight: 600;
 	}
 
 	.form-row {

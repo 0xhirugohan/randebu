@@ -22,6 +22,7 @@ def run_backtest_sync(
     backtest_id: str, db_url: str, bot_id: str, config: Dict[str, Any]
 ):
     import asyncio
+    import json
     from ..services.backtest.engine import BacktestEngine
     from ..core.database import SessionLocal
 
@@ -31,6 +32,19 @@ def run_backtest_sync(
         running_backtests[backtest_id] = engine
         try:
             results = await engine.run()
+            
+            # Convert datetime objects to ISO strings for JSON serialization
+            def convert_datetime(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif isinstance(obj, dict):
+                    return {k: convert_datetime(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_datetime(i) for i in obj]
+                return obj
+            
+            results = convert_datetime(results)
+            
             db = SessionLocal()
             try:
                 backtest = db.query(Backtest).filter(Backtest.id == backtest_id).first()
@@ -41,17 +55,18 @@ def run_backtest_sync(
                     db.commit()
 
                 for signal in engine.signals:
+                    signal_data = convert_datetime(signal)
                     db_signal = Signal(
-                        id=signal["id"],
-                        bot_id=signal["bot_id"],
-                        run_id=signal["run_id"],
-                        signal_type=signal["signal_type"],
-                        token=signal["token"],
-                        price=signal["price"],
-                        confidence=signal.get("confidence"),
-                        reasoning=signal.get("reasoning"),
-                        executed=signal.get("executed", False),
-                        created_at=signal["created_at"],
+                        id=signal_data["id"],
+                        bot_id=signal_data["bot_id"],
+                        run_id=signal_data["run_id"],
+                        signal_type=signal_data["signal_type"],
+                        token=signal_data["token"],
+                        price=signal_data["price"],
+                        confidence=signal_data.get("confidence"),
+                        reasoning=signal_data.get("reasoning"),
+                        executed=signal_data.get("executed", False),
+                        created_at=signal_data["created_at"],
                     )
                     db.add(db_signal)
                 db.commit()
