@@ -53,12 +53,15 @@ export function parseMarkdown(text: string): ParsedSegment[] {
 function parseInlineContent(text: string): ParsedSegment[] {
 	const segments: ParsedSegment[] = [];
 	
-	// Check for tables first
-	const tableRegex = /^\|.+\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)*)/gm;
+	// Check for tables - match table pattern anywhere in text
+	// Table pattern: | header | ... |\n|---|...|\n| row | ... |
+	const tableRegex = /\|.+\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)*)/g;
+	let lastIndex = 0;
 	let tableMatch;
+	
 	while ((tableMatch = tableRegex.exec(text)) !== null) {
 		// Add content before table
-		const beforeTable = text.substring(0, tableMatch.index);
+		const beforeTable = text.substring(lastIndex, tableMatch.index);
 		if (beforeTable.trim()) {
 			segments.push(...parseLines(beforeTable));
 		}
@@ -66,15 +69,22 @@ function parseInlineContent(text: string): ParsedSegment[] {
 		// Parse table
 		const tableContent = tableMatch[0];
 		const tableSegments = parseTable(tableContent);
-		segments.push(...tableSegments);
+		if (tableSegments.length > 0) {
+			segments.push(...tableSegments);
+		} else {
+			// If table parsing failed, treat as text
+			segments.push(...parseLines(tableContent));
+		}
 		
-		// Update text for next iteration
-		text = text.substring(tableMatch.index + tableContent.length);
+		lastIndex = tableMatch.index + tableContent.length;
 	}
 	
 	// Add remaining content
-	if (text.trim()) {
-		segments.push(...parseLines(text));
+	if (lastIndex < text.length) {
+		const remaining = text.substring(lastIndex);
+		if (remaining.trim()) {
+			segments.push(...parseLines(remaining));
+		}
 	}
 	
 	return segments;
