@@ -120,7 +120,7 @@ class StrategyExplainer:
 
 
 def create_trading_designer_agent(
-    api_key: str, model: str = "MiniMax-Text-01"
+    api_key: str, model: str = "MiniMax-M2.7"
 ) -> Agent:
     connector = MiniMaxConnector(api_key=api_key, model=model)
 
@@ -147,7 +147,7 @@ def create_trading_designer_agent(
 
 
 def create_strategy_validator_agent(
-    api_key: str, model: str = "MiniMax-Text-01"
+    api_key: str, model: str = "MiniMax-M2.7"
 ) -> Agent:
     return Agent(
         role="Strategy Validator",
@@ -161,7 +161,7 @@ def create_strategy_validator_agent(
 
 
 def create_strategy_explainer_agent(
-    api_key: str, model: str = "MiniMax-Text-01"
+    api_key: str, model: str = "MiniMax-M2.7"
 ) -> Agent:
     return Agent(
         role="Strategy Explainer",
@@ -175,7 +175,7 @@ def create_strategy_explainer_agent(
 
 
 class TradingCrew:
-    def __init__(self, api_key: str, model: str = "MiniMax-Text-01"):
+    def __init__(self, api_key: str, model: str = "MiniMax-M2.7"):
         self.api_key = api_key
         self.model = model
         self.validator = StrategyValidator()

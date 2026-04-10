@@ -4,11 +4,11 @@ from crewai import LLM
 
 
 class MiniMaxLLM(LLM):
-    def __init__(self, api_key: str, model: str = "MiniMax-Text-01", **kwargs):
+    def __init__(self, api_key: str, model: str = "MiniMax-M2.7", **kwargs):
         super().__init__(**kwargs)
         self.api_key = api_key
         self.model = model
-        self.base_url = "https://api.minimax.chat/v1"
+        self.base_url = "https://api.minimax.io/v1"
 
     def _call(self, messages: List[Dict[str, str]], **kwargs) -> str:
         headers = {
