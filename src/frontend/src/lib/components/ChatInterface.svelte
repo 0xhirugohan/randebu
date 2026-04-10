@@ -128,22 +128,50 @@
 							<div class="table-wrapper">
 								<table class="markdown-table">
 									<thead>
-									<tr>
-										{#each segment.headers as header}
-											<th>{header}</th>
-										{/each}
-									</tr>
-								</thead>
-								<tbody>
-									{#each segment.rows as row}
 										<tr>
-											{#each row as cell}
-												<td>{cell}</td>
+											{#each segment.headers as header}
+												<th>
+													{#each header as cellSeg}
+														{#if cellSeg.type === 'bold'}
+															<strong>{cellSeg.content}</strong>
+														{:else if cellSeg.type === 'italic'}
+															<em>{cellSeg.content}</em>
+														{:else if cellSeg.type === 'code'}
+															<code class="inline-code">{cellSeg.content}</code>
+														{:else if cellSeg.type === 'link'}
+															<a href={cellSeg.href} target="_blank" rel="noopener noreferrer">{cellSeg.content}</a>
+														{:else}
+															{cellSeg.content}
+														{/if}
+													{/each}
+												</th>
 											{/each}
-									</tr>
-									{/each}
-								</tbody>
-							</table>
+										</tr>
+									</thead>
+									<tbody>
+										{#each segment.rows as row}
+											<tr>
+												{#each row as cell}
+													<td>
+														{#each cell as cellSeg}
+															{#if cellSeg.type === 'bold'}
+																<strong>{cellSeg.content}</strong>
+															{:else if cellSeg.type === 'italic'}
+																<em>{cellSeg.content}</em>
+															{:else if cellSeg.type === 'code'}
+																<code class="inline-code">{cellSeg.content}</code>
+															{:else if cellSeg.type === 'link'}
+																<a href={cellSeg.href} target="_blank" rel="noopener noreferrer">{cellSeg.content}</a>
+															{:else}
+																{cellSeg.content}
+															{/if}
+														{/each}
+													</td>
+												{/each}
+											</tr>
+										{/each}
+									</tbody>
+								</table>
 							</div>
 						{:else if segment.type === 'heading'}
 							<h4 class="content-heading">{segment.content}</h4>
@@ -158,7 +186,7 @@
 					{message.timestamp.toLocaleTimeString()}
 				</div>
 			</div>
-	{/each}
+		{/each}
 
 		{#if isSending}
 			<div class="message assistant">
@@ -345,60 +373,6 @@
 		border: 1px solid rgba(251, 191, 36, 0.3);
 	}
 
-	.message.thinking .message-content {
-		background: rgba(255, 255, 255, 0.05);
-		border: 1px dashed rgba(255, 255, 255, 0.2);
-	}
-
-	.message-time {
-		font-size: 0.7rem;
-		color: #666;
-		margin-top: 0.25rem;
-		padding: 0 0.5rem;
-	}
-
-	.thinking-header {
-		display: flex;
-		align-items: center;
-		margin-bottom: 0.5rem;
-	}
-
-	.thinking-toggle {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		background: none;
-		border: none;
-		color: #888;
-		cursor: pointer;
-		padding: 0.25rem 0.5rem;
-		border-radius: 4px;
-		font-size: 0.8rem;
-		transition: background 0.2s;
-	}
-
-	.thinking-toggle:hover {
-		background: rgba(255, 255, 255, 0.1);
-	}
-
-	.thinking-icon {
-		font-size: 0.6rem;
-	}
-
-	.thinking-label {
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.thinking-content {
-		color: #999;
-		font-size: 0.9rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
-		margin-top: 0.5rem;
-	}
-
 	.inline-code {
 		background: rgba(0, 0, 0, 0.3);
 		padding: 0.15rem 0.4rem;
@@ -428,11 +402,6 @@
 
 	li {
 		margin: 0.25rem 0;
-	}
-
-	a {
-		color: #667eea;
-		text-decoration: none;
 	}
 
 	.content-heading {
@@ -481,8 +450,20 @@
 		background: rgba(255, 255, 255, 0.05);
 	}
 
+	a {
+		color: #667eea;
+		text-decoration: none;
+	}
+
 	a:hover {
 		text-decoration: underline;
+	}
+
+	.message-time {
+		font-size: 0.7rem;
+		color: #666;
+		margin-top: 0.25rem;
+		padding: 0 0.5rem;
 	}
 
 	.typing {

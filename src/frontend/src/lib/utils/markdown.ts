@@ -3,12 +3,18 @@
  * Supports: bold, italic, code blocks, inline code, links, lists, tables, headings, line breaks
  */
 
+interface InlineSegment {
+	type: 'text' | 'bold' | 'italic' | 'code' | 'link';
+	content: string;
+	href?: string;
+}
+
 interface ParsedSegment {
 	type: 'text' | 'bold' | 'italic' | 'code' | 'codeBlock' | 'link' | 'list' | 'table' | 'lineBreak' | 'heading';
 	content: string;
 	items?: string[];
-	headers?: string[];
-	rows?: string[][];
+	headers?: InlineSegment[][];
+	rows?: InlineSegment[][];
 }
 
 export function parseMarkdown(text: string): ParsedSegment[] {
@@ -79,7 +85,7 @@ function parseTable(tableStr: string): ParsedSegment[] {
 	if (lines.length < 2) return [];
 	
 	// Skip separator line (|---|---|)
-	const dataLines = lines.filter(line => !line.match(/^[\|\s-]+$/));
+	const dataLines = lines.filter(line => !line.match(/^[\|\s\-:]+$/));
 	if (dataLines.length < 2) return [];
 	
 	const headers = parseTableRow(dataLines[0]);
@@ -93,8 +99,39 @@ function parseTable(tableStr: string): ParsedSegment[] {
 	}];
 }
 
-function parseTableRow(row: string): string[] {
-	return row.split('|').map(cell => cell.trim()).filter(cell => cell !== '');
+function parseTableRow(row: string): InlineSegment[][] {
+	return row.split('|')
+		.map(cell => cell.trim())
+		.filter(cell => cell !== '')
+		.map(cell => parseInlineElements(cell));
+}
+
+function parseInlineElements(text: string): InlineSegment[] {
+	const segments: InlineSegment[] = [];
+	
+	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g;
+	const parts = text.split(inlineRegex);
+	
+	for (const part of parts) {
+		if (!part) continue;
+		
+		if (part.startsWith('**') && part.endsWith('**')) {
+			segments.push({ type: 'bold', content: part.slice(2, -2) });
+		} else if (part.startsWith('*') && part.endsWith('*')) {
+			segments.push({ type: 'italic', content: part.slice(1, -1) });
+		} else if (part.startsWith('`') && part.endsWith('`')) {
+			segments.push({ type: 'code', content: part.slice(1, -1) });
+		} else if (part.startsWith('[') && part.includes('](')) {
+			const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
+			if (linkMatch) {
+				segments.push({ type: 'link', content: linkMatch[1], href: linkMatch[2] });
+			}
+		} else if (part) {
+			segments.push({ type: 'text', content: part });
+		}
+	}
+	
+	return segments;
 }
 
 function parseLines(text: string): ParsedSegment[] {
@@ -149,7 +186,7 @@ function parseLines(text: string): ParsedSegment[] {
 		}
 		
 		// Process inline formatting
-		const inlineSegments = parseInlineElements(line);
+		const inlineSegments = parseInlineElementsAsText(line);
 		segments.push(...inlineSegments);
 		
 		// Add line break after non-empty lines (except last in a paragraph)
@@ -161,7 +198,7 @@ function parseLines(text: string): ParsedSegment[] {
 	return segments;
 }
 
-function parseInlineElements(text: string): ParsedSegment[] {
+function parseInlineElementsAsText(text: string): ParsedSegment[] {
 	const segments: ParsedSegment[] = [];
 	
 	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g;
