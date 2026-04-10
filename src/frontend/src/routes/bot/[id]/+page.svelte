@@ -44,11 +44,17 @@
 		
 		isSending = true;
 
-		// Add user's message immediately
+		// Add user's message immediately so it shows even before API response
 		addMessage({ role: 'user', content: message });
 
 		try {
-			const response = await api.bots.chat(botId, message);
+			// Add timeout to prevent hanging requests
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => controller.abort(), 30000);
+			
+			const response = await api.bots.chat(botId, message, controller.signal);
+			clearTimeout(timeoutId);
+			
 			addMessage({ role: 'assistant', content: response.response });
 			
 			if (response.strategy_config) {
@@ -56,7 +62,11 @@
 				setCurrentBot(bot);
 			}
 		} catch (e) {
-			addMessage({ role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' });
+			if (e instanceof Error && e.name === 'AbortError') {
+				addMessage({ role: 'assistant', content: 'Request timed out. Please try again.' });
+			} else {
+				addMessage({ role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' });
+			}
 		} finally {
 			isSending = false;
 		}
