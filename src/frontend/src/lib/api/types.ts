@@ -26,6 +26,7 @@ export interface StrategyConfig {
 export interface Condition {
 	type: 'price_drop' | 'price_rise' | 'volume_spike' | 'price_level';
 	token: string;
+	token_address?: string;
 	chain?: string;
 	threshold?: number;
 	price?: number;
@@ -37,6 +38,7 @@ export interface Action {
 	type: 'buy' | 'sell' | 'hold';
 	amount_percent?: number;
 	token?: string;
+	token_address?: string;
 }
 
 export interface RiskManagement {

@@ -40,37 +40,28 @@ class BacktestEngine:
         started_at = datetime.utcnow()
 
         try:
-            token = self.config.get("token", "")
             chain = self.config.get("chain", "bsc")
             timeframe = self.config.get("timeframe", "1h")
             start_date = self.config.get("start_date", "")
             end_date = self.config.get("end_date", "")
 
-            # Search for token to get proper token_id (contract address)
-            try:
-                tokens = await self.ave_client.get_tokens(query=token, chain=chain, limit=10)
-                if not tokens:
-                    raise ValueError(f"Token '{token}' not found on {chain}")
-                
-                # Find matching token
-                token_info = None
-                for t in tokens:
-                    if t.get("symbol", "").upper() == token.upper() or t.get("name", "").upper() == token.upper():
-                        token_info = t
-                        break
-                
-                if not token_info:
-                    # Use first result if exact match not found
-                    token_info = tokens[0]
-                
-                token_id = token_info.get("id") or token_info.get("contract_address")
-                if not token_id:
-                    raise ValueError(f"Could not find token ID for '{token}'")
-                
-            except Exception as e:
-                self.status = "failed"
-                self.results = {"error": f"Failed to find token: {str(e)}"}
-                return self.results
+            # Get token address from strategy config (saved when user confirmed token)
+            token_address = None
+            token_symbol = None
+            
+            # Try to get from conditions first
+            if self.conditions:
+                token_address = self.conditions[0].get("token_address")
+                token_symbol = self.conditions[0].get("token")
+            # Fallback to actions
+            if not token_address and self.actions:
+                token_address = self.actions[0].get("token_address")
+                token_symbol = self.actions[0].get("token") or token_symbol
+            
+            if not token_address:
+                raise ValueError("Token address not found in strategy. Please update your strategy with a valid token.")
+            
+            token_id = token_address
 
             start_ts = None
             end_ts = None

@@ -24,7 +24,7 @@ Your response must be valid JSON with exactly this structure:
   "thinking": "Your internal reasoning and analysis (what you're thinking about)",
   "response": "Your actual response to the user (be concise and helpful)",
   "strategy_update": null or {
-    "conditions": [{"type": "price_drop" | "price_rise" | "volume_spike" | "price_level", "token": "TOKEN", "threshold": number, ...}],
+    "conditions": [{"type": "price_drop" | "price_rise" | "volume_spike" | "price_level", "token": "TOKEN_SYMBOL", "token_address": null, "threshold": number, ...}],
     "actions": [{"type": "buy" | "sell" | "hold", "amount_percent": number, ...}],
     "risk_management": {"stop_loss_percent": number, "take_profit_percent": number}
   }
@@ -34,6 +34,7 @@ Guidelines:
 - "thinking" should be detailed reasoning about the user's request
 - "response" should be conversational and clear
 - "strategy_update" should be populated ONLY when the user provides specific trading parameters (percentages, tokens, conditions, etc.)
+- IMPORTANT: When a token is mentioned, set "token_address": null and ask user to confirm the token address before saving. Your response should say something like: "I need to confirm the token address. Could you provide the contract address for [TOKEN]?"
 - If no strategy parameters are provided, set "strategy_update" to null
 - Be friendly, concise, and helpful in your response
 
@@ -45,15 +46,27 @@ User: "What can this bot do?"
   "strategy_update": null
 }
 
-Example 2 (with strategy update):
-User: "I want to buy PEPE when it drops 10% and take profit at 50%"
+Example 2 (token needs confirmation):
+User: "I want to buy PEPE when it drops 10%"
 {
-  "thinking": "User wants to buy PEPE when it drops 10%, with 50% take profit. I should parse these into conditions and actions.",
-  "response": "Got it! I've configured your strategy to buy PEPE when it drops 10%, with a 50% take profit target.",
+  "thinking": "User wants to buy PEPE. I need the token contract address to proceed. I should ask for confirmation.",
+  "response": "I'd be happy to set up a buy order for PEPE! However, I need to confirm the token contract address. Could you provide the BSC contract address for PEPE? (It usually starts with 0x...)",
   "strategy_update": {
-    "conditions": [{"type": "price_drop", "token": "PEPE", "threshold": 10}],
+    "conditions": [{"type": "price_drop", "token": "PEPE", "token_address": null, "threshold": 10}],
     "actions": [{"type": "buy", "amount_percent": 100}],
-    "risk_management": {"take_profit_percent": 50}
+    "risk_management": null
+  }
+}
+
+Example 3 (with token address provided by user):
+User: "Buy 0x6982508145454Ce125dDE157d8d64a26D53f60a2 when it drops 10%"
+{
+  "thinking": "User provided a contract address, I can use it directly.",
+  "response": "Perfect! I've configured your strategy to buy the token when it drops 10%.",
+  "strategy_update": {
+    "conditions": [{"type": "price_drop", "token": "TOKEN", "token_address": "0x6982508145454Ce125dDE157d8d64a26D53f60a2", "threshold": 10}],
+    "actions": [{"type": "buy", "amount_percent": 100}],
+    "risk_management": null
   }
 }"""
 
@@ -91,9 +104,6 @@ class ConversationalAgent:
             messages.append({"role": "user", "content": user_message})
             
             # Make API call to extended thinking endpoint
-            # Use requests library directly for this endpoint since it's not OpenAI-compatible
-            import requests
-            
             resp = requests.post(
                 self.thinking_endpoint,
                 headers={
@@ -153,6 +163,27 @@ class ConversationalAgent:
             # Use the native thinking from API if available, otherwise use parsed thinking
             final_thinking = thinking or thinking_field
             
+            # Check if token_address is missing in strategy_update
+            strategy_needs_confirmation = False
+            if strategy_update:
+                for cond in strategy_update.get("conditions", []):
+                    if not cond.get("token_address"):
+                        strategy_needs_confirmation = True
+                        break
+            
+            # Only update strategy if token_address is provided
+            if strategy_update and strategy_needs_confirmation:
+                # Don't auto-save - user needs to confirm token address
+                # Return response but with strategy_update as None
+                return {
+                    "response": response_text,
+                    "thinking": final_thinking,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": True,
+                    "strategy_data": strategy_update,
+                    "success": True
+                }
+            
             # Update strategy in database if provided
             if strategy_update and self.bot_id:
                 self._update_strategy(strategy_update)
@@ -161,6 +192,7 @@ class ConversationalAgent:
                 "response": response_text,
                 "thinking": final_thinking,
                 "strategy_updated": strategy_update is not None,
+                "strategy_needs_confirmation": False,
                 "success": True
             }
             

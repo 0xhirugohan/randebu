@@ -32,15 +32,6 @@
 		if ($isAuthenticated && botId) {
 			await loadBot();
 			await loadBacktests();
-			
-			// Poll for backtest updates every 2 seconds if any are running
-			const pollInterval = setInterval(async () => {
-				if ($backtestStore.backtestHistory.some(b => b.status === 'running')) {
-					await loadBacktests();
-				}
-			}, 2000);
-			
-			return () => clearInterval(pollInterval);
 		}
 	});
 
@@ -162,7 +153,12 @@
 		</section>
 
 		<section class="results-section">
-			<h2>Backtest History</h2>
+			<div class="section-header">
+				<h2>Backtest History</h2>
+				<button class="btn-refresh" onclick={() => loadBacktests()} disabled={$backtestStore.isLoading}>
+					{$backtestStore.isLoading ? 'Refreshing...' : 'Refresh'}
+				</button>
+			</div>
 			
 			{#if $backtestStore.backtestHistory.length === 0}
 				<p class="empty-state">No backtests yet. Run your first backtest above.</p>
@@ -265,7 +261,40 @@
 
 	h2 {
 		font-size: 1.25rem;
-		margin: 0 0 1rem;
+		margin: 0;
+	}
+
+	.section-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.section-header h2 {
+		margin: 0;
+	}
+
+	.btn-refresh {
+		padding: 0.5rem 1rem;
+		background: rgba(255, 255, 255, 0.1);
+		color: white;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 6px;
+		font-size: 0.85rem;
+		cursor: pointer;
+		width: auto;
+	}
+
+	.btn-refresh:hover:not(:disabled) {
+		background: rgba(255, 255, 255, 0.15);
+		transform: none;
+	}
+
+	.btn-refresh:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 	}
 
 	.content {
