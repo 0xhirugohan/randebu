@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, chatStore, addMessage, setMessages, clearChat, currentBotStore, setCurrentBot } from '$lib/stores';
 	import { api } from '$lib/api';
-	import { ChatInterface, StrategyPreview, ProUpgradeBanner } from '$lib/components';
+	import { ChatInterface, StrategyPreview } from '$lib/components';
 
 	let botId = $derived($page.params.id);
 	let isSending = $state(false);
@@ -113,7 +113,7 @@
 		/>
 	</div>
 
-	<ProUpgradeBanner feature="Auto-execute trades with your bot" />
+	<!-- <ProUpgradeBanner feature="Auto-execute trades with your bot" /> -->
 </main>
 
 <style>
