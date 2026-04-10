@@ -23,10 +23,9 @@ class AveCloudClient:
         chain: Optional[str] = None,
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        url = f"{self.DATA_API_URL}/v2/tokens"
-        params = {"limit": limit}
-        if query:
-            params["query"] = query
+        # Use trending endpoint which supports chain filter
+        url = f"{self.DATA_API_URL}/v2/tokens/trending"
+        params = {"limit": min(limit, 100)}  # API returns max 100
         if chain:
             params["chain"] = chain
 
@@ -36,8 +35,18 @@ class AveCloudClient:
             )
             response.raise_for_status()
             data = response.json()
-            if data.get("status") == 200:
-                return data.get("data", [])
+            if data.get("status") == 1:  # 1 = SUCCESS
+                tokens = data.get("data", {}).get("tokens", [])
+                # Filter by query if provided
+                if query:
+                    query_lower = query.lower()
+                    tokens = [
+                        t for t in tokens
+                        if query_lower in t.get("symbol", "").lower()
+                        or query_lower in t.get("name", "").lower()
+                    ]
+                return tokens[:limit]
+            return []
             raise Exception(f"Failed to fetch tokens: {data}")
 
     async def get_batch_prices(self, token_ids: List[str]) -> Dict[str, Dict[str, Any]]:

@@ -194,7 +194,7 @@ class ConversationalAgent:
                                 {
                                     "symbol": t.get("symbol", ""),
                                     "name": t.get("name", ""),
-                                    "address": t.get("id") or t.get("contract_address", ""),
+                                    "address": t.get("token", ""),  # trending API uses "token" for contract address
                                     "chain": t.get("chain", "bsc")
                                 }
                                 for t in tokens
