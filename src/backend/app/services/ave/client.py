@@ -82,6 +82,10 @@ class AveCloudClient:
         start_time: Optional[int] = None,
         end_time: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
+        # Token ID must be in format "{contract_address}-bsc" for the AVE API
+        if not token_id.endswith("-bsc") and token_id.startswith("0x"):
+            token_id = f"{token_id}-bsc"
+        
         url = f"{self.DATA_API_URL}/v2/klines/token/{token_id}"
         params = {"interval": interval, "limit": limit}
         if start_time:
