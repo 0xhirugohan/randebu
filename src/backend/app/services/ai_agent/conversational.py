@@ -171,7 +171,52 @@ class ConversationalAgent:
             if "choices" in result and len(result["choices"]) > 0:
                 choice = result["choices"][0]
                 if "message" in choice:
-                    thinking = choice["message"].get("reasoning_content")
+                    message = choice["message"]
+                    thinking = message.get("reasoning_content")
+                    
+                    # Check for native function calls (tool_calls)
+                    tool_calls = message.get("tool_calls", [])
+                    if tool_calls:
+                        for tool_call in tool_calls:
+                            func = tool_call.get("function", {})
+                            if func.get("name") == "search_tokens":
+                                args = json.loads(func.get("arguments", "{}"))
+                                chain = args.get("chain", "bsc")
+                                limit = args.get("limit", 10)
+                                
+                                # Execute the tool
+                                from ..ave.client import AveCloudClient
+                                from ...core.config import get_settings
+                                settings = get_settings()
+                                ave_client = AveCloudClient(
+                                    api_key=settings.AVE_API_KEY,
+                                    plan=settings.AVE_API_PLAN
+                                )
+                                import asyncio
+                                tokens = asyncio.run(ave_client.get_tokens(chain=chain, limit=limit))
+                                
+                                if tokens:
+                                    # Format tokens for response
+                                    token_list = ""
+                                    for t in tokens[:limit]:
+                                        addr = t.get("token", "")
+                                        symbol = t.get("symbol", "")
+                                        name = t.get("name", "")
+                                        price_change = t.get("token_price_change_24h", "N/A")
+                                        token_list += f"- **{symbol}** ({name}): `{addr}` - 24h change: {price_change}%\n"
+                                    
+                                    response_text = f"Here are the trending tokens on {chain.upper()}:\n\n{token_list}\nWould you like me to set up a strategy for any of these?"
+                                else:
+                                    response_text = f"I couldn't find any trending tokens on {chain.upper()}. Try again later."
+                                
+                                # Return the tool result directly
+                                return {
+                                    "response": response_text,
+                                    "thinking": thinking,
+                                    "strategy_updated": False,
+                                    "strategy_needs_confirmation": False,
+                                    "success": True
+                                }
             
             # Get the main response content
             content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
