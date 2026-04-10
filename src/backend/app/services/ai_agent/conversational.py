@@ -19,6 +19,12 @@ from ...db.models import Bot
 
 SYSTEM_PROMPT = """You are a helpful AI trading assistant named Randebu. You help users manage their trading bots.
 
+IMPORTANT CHAIN LIMITATION:
+- We ONLY support BSC (Binance Smart Chain) blockchain
+- If user asks about any other chain (Solana, ETH, Base, etc.), respond with: "Currently we only support BSC (Binance Smart Chain). All trading strategies and token searches are performed on BSC."
+- Never search or recommend tokens on other chains
+- The search_tokens tool defaults to BSC, never change this
+
 Your response must be valid JSON with exactly this structure:
 {
   "thinking": "Your internal reasoning and analysis (what you're thinking about)",
@@ -77,22 +83,17 @@ TOOLS = [
         "type": "function",
         "function": {
             "name": "search_tokens",
-            "description": "Search for trending tokens on a blockchain. Use this when user asks for token recommendations, trending tokens, or wants to discover new tokens to trade.",
+            "description": "Search for trending tokens on BSC blockchain. Use this when user asks for token recommendations, trending tokens, or wants to discover new tokens to trade. ALWAYS uses BSC chain.",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "chain": {
-                        "type": "string",
-                        "description": "The blockchain to search on. Supported: bsc, solana, eth, base",
-                        "enum": ["bsc", "solana", "eth", "base"]
-                    },
                     "limit": {
                         "type": "integer",
                         "description": "Number of tokens to return (default: 10)",
                         "default": 10
                     }
                 },
-                "required": ["chain"]
+                "required": []
             }
         }
     }
@@ -181,7 +182,7 @@ class ConversationalAgent:
                             func = tool_call.get("function", {})
                             if func.get("name") == "search_tokens":
                                 args = json.loads(func.get("arguments", "{}"))
-                                chain = args.get("chain", "bsc")
+                                chain = "bsc"  # Always BSC
                                 limit = args.get("limit", 10)
                                 
                                 # Execute the tool
