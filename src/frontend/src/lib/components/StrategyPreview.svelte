@@ -10,13 +10,14 @@
 	let { config, editable = false, onUpdate }: Props = $props();
 
 	function getConditionDescription(condition: StrategyConfig['conditions'][0]): string {
+		const timeframe = condition.timeframe ? ` within ${condition.timeframe}` : '';
 		switch (condition.type) {
 			case 'price_drop':
-				return `${condition.token} drops by ${condition.threshold}% within ${condition.timeframe}`;
+				return `${condition.token} drops by ${condition.threshold}%${timeframe}`;
 			case 'price_rise':
-				return `${condition.token} rises by ${condition.threshold}% within ${condition.timeframe}`;
+				return `${condition.token} rises by ${condition.threshold}%${timeframe}`;
 			case 'volume_spike':
-				return `${condition.token} volume spikes by ${condition.threshold}% within ${condition.timeframe}`;
+				return `${condition.token} volume spikes by ${condition.threshold}%${timeframe}`;
 			case 'price_level':
 				return `${condition.token} crosses ${condition.direction} $${condition.price}`;
 			default:
