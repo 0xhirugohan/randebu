@@ -5,7 +5,7 @@ This agent can:
 1. Have normal conversations with users
 2. Update trading strategies when user provides specific instructions
 
-Uses direct LLM API calls for structured JSON output with separated thinking and response.
+Uses MiniMax extended thinking API for proper thinking/reasoning separation.
 """
 
 import json
@@ -65,10 +65,14 @@ class ConversationalAgent:
         self.bot_id = bot_id
         
         # Create OpenAI-compatible client for MiniMax
+        # Use the extended thinking endpoint
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://api.minimax.io/v1"
         )
+        
+        # Extended thinking endpoint
+        self.thinking_endpoint = "https://api.minimax.io/v1/text/chatcompletion_v2"
     
     def chat(self, user_message: str, conversation_history: List[Dict] = None) -> Dict[str, Any]:
         """Process a user message and return a structured response.
@@ -93,18 +97,39 @@ class ConversationalAgent:
             # Add current user message
             messages.append({"role": "user", "content": user_message})
             
-            # Make API call
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=2000
+            # Make API call to extended thinking endpoint
+            response = self.client.post(
+                self.thinking_endpoint,
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 2000,
+                    "thinking": {
+                        "type": "human",
+                        "budget_tokens": 1500
+                    }
+                }
             )
             
-            # Parse JSON response
-            content = response.choices[0].message.content.strip()
+            result = response.json()
             
-            # Extract JSON from response (handle markdown code blocks)
+            # Extract thinking from reasoning_content
+            thinking = None
+            if "choices" in result and len(result["choices"]) > 0:
+                choice = result["choices"][0]
+                if "message" in choice:
+                    thinking = choice["message"].get("reasoning_content")
+            
+            # Get the main response content
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
+            # Parse JSON from the content
+            thinking_field = None
+            response_text = content
+            strategy_update = None
+            
+            # Try to extract JSON from the content
             json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', content, re.DOTALL)
             if json_match:
                 json_str = json_match.group(1)
@@ -114,14 +139,19 @@ class ConversationalAgent:
                 if json_match:
                     json_str = json_match.group(0)
                 else:
-                    json_str = content
+                    json_str = None
             
-            result = json.loads(json_str)
+            if json_str:
+                try:
+                    parsed = json.loads(json_str)
+                    thinking_field = parsed.get("thinking", "")
+                    response_text = parsed.get("response", content)
+                    strategy_update = parsed.get("strategy_update")
+                except json.JSONDecodeError:
+                    pass  # Use defaults
             
-            # Extract fields
-            thinking = result.get("thinking", "")
-            response_text = result.get("response", "")
-            strategy_update = result.get("strategy_update")
+            # Use the native thinking from API if available, otherwise use parsed thinking
+            final_thinking = thinking or thinking_field
             
             # Update strategy in database if provided
             if strategy_update and self.bot_id:
@@ -129,18 +159,11 @@ class ConversationalAgent:
             
             return {
                 "response": response_text,
-                "thinking": thinking,
+                "thinking": final_thinking,
                 "strategy_updated": strategy_update is not None,
                 "success": True
             }
             
-        except json.JSONDecodeError as e:
-            return {
-                "response": "I had trouble formatting my response. Please try again.",
-                "thinking": f"JSON parsing error: {str(e)}. Raw content: {content if 'content' in dir() else 'N/A'}",
-                "strategy_updated": False,
-                "success": False
-            }
         except Exception as e:
             return {
                 "response": f"I encountered an error: {str(e)}. Please try again.",
