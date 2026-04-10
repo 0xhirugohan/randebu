@@ -23,8 +23,11 @@
 		// Set max date to yesterday
 		const maxDate = yesterday.toISOString().split('T')[0];
 		
+		// Set end to yesterday, start to day before (1 day range)
 		endDate = maxDate;
-		startDate = maxDate;  // Same day = 1 day backtest
+		const dayBefore = new Date(yesterday);
+		dayBefore.setDate(dayBefore.getDate() - 1);
+		startDate = dayBefore.toISOString().split('T')[0];
 		
 		if (!$isAuthenticated && !$isLoading) {
 			goto('/login');
