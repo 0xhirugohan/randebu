@@ -46,14 +46,31 @@ class BacktestEngine:
             start_date = self.config.get("start_date", "")
             end_date = self.config.get("end_date", "")
 
-            token_id = (
-                f"{token}-{chain}"
-                if token and not token.endswith(f"-{chain}")
-                else token
-            )
-
-            if not token_id or token_id == f"-{chain}":
-                raise ValueError("Token ID is required")
+            # Search for token to get proper token_id (contract address)
+            try:
+                tokens = await self.ave_client.get_tokens(query=token, chain=chain, limit=10)
+                if not tokens:
+                    raise ValueError(f"Token '{token}' not found on {chain}")
+                
+                # Find matching token
+                token_info = None
+                for t in tokens:
+                    if t.get("symbol", "").upper() == token.upper() or t.get("name", "").upper() == token.upper():
+                        token_info = t
+                        break
+                
+                if not token_info:
+                    # Use first result if exact match not found
+                    token_info = tokens[0]
+                
+                token_id = token_info.get("id") or token_info.get("contract_address")
+                if not token_id:
+                    raise ValueError(f"Could not find token ID for '{token}'")
+                
+            except Exception as e:
+                self.status = "failed"
+                self.results = {"error": f"Failed to find token: {str(e)}"}
+                return self.results
 
             start_ts = None
             end_ts = None
