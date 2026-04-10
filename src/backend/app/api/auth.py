@@ -58,7 +58,7 @@ def get_current_user(
 
 
 @router.post(
-    "/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+    "/register", response_model=Token, status_code=status.HTTP_201_CREATED
 )
 def register(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user.email).first()
@@ -75,7 +75,10 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    
+    # Generate and return access token so frontend can proceed immediately
+    access_token = create_access_token(data={"sub": db_user.id})
+    return Token(access_token=access_token, token_type="bearer")
 
 
 @router.post("/login", response_model=Token)
