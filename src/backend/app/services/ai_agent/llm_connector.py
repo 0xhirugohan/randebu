@@ -33,7 +33,7 @@ class MiniMaxLLM:
 
 
 class MiniMaxConnector:
-    def __init__(self, api_key: str, model: str = "MiniMax-Text-01"):
+    def __init__(self, api_key: str, model: str = "MiniMax-M2.7"):
         self.api_key = api_key
         self.model = model
 
