@@ -124,6 +124,31 @@
 									<li>{item}</li>
 								{/each}
 							</ul>
+						{:else if segment.type === 'table' && segment.headers && segment.rows}
+							<div class="table-wrapper">
+								<table class="markdown-table">
+									<thead>
+									<tr>
+										{#each segment.headers as header}
+											<th>{header}</th>
+										{/each}
+									</tr>
+								</thead>
+								<tbody>
+									{#each segment.rows as row}
+										<tr>
+											{#each row as cell}
+												<td>{cell}</td>
+											{/each}
+									</tr>
+									{/each}
+								</tbody>
+							</table>
+							</div>
+						{:else if segment.type === 'heading'}
+							<h4 class="content-heading">{segment.content}</h4>
+						{:else if segment.type === 'lineBreak'}
+							<br />
 						{:else}
 							{segment.content}
 						{/if}
@@ -408,6 +433,52 @@
 	a {
 		color: #667eea;
 		text-decoration: none;
+	}
+
+	.content-heading {
+		font-size: 1rem;
+		font-weight: 600;
+		margin: 1rem 0 0.5rem;
+		color: #fff;
+	}
+
+	.content-heading:first-child {
+		margin-top: 0;
+	}
+
+	.table-wrapper {
+		overflow-x: auto;
+		margin: 0.75rem 0;
+	}
+
+	.markdown-table {
+		border-collapse: collapse;
+		width: 100%;
+		font-size: 0.85rem;
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 6px;
+		overflow: hidden;
+	}
+
+	.markdown-table th,
+	.markdown-table td {
+		padding: 0.5rem 0.75rem;
+		text-align: left;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.markdown-table th {
+		background: rgba(102, 126, 234, 0.2);
+		font-weight: 600;
+		color: #667eea;
+	}
+
+	.markdown-table tr:last-child td {
+		border-bottom: none;
+	}
+
+	.markdown-table tr:hover td {
+		background: rgba(255, 255, 255, 0.05);
 	}
 
 	a:hover {

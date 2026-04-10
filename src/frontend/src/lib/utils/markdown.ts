@@ -1,18 +1,23 @@
 /**
  * Simple markdown parser for rendering AI responses
- * Supports: bold, italic, code blocks, inline code, links, lists, headings
+ * Supports: bold, italic, code blocks, inline code, links, lists, tables, headings, line breaks
  */
 
 interface ParsedSegment {
-	type: 'text' | 'bold' | 'italic' | 'code' | 'codeBlock' | 'link' | 'list';
+	type: 'text' | 'bold' | 'italic' | 'code' | 'codeBlock' | 'link' | 'list' | 'table' | 'lineBreak' | 'heading';
 	content: string;
 	items?: string[];
+	headers?: string[];
+	rows?: string[][];
 }
 
 export function parseMarkdown(text: string): ParsedSegment[] {
 	const segments: ParsedSegment[] = [];
 	
-	// Split by code blocks first (they can contain other markdown)
+	// Normalize line endings
+	text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	
+	// First, extract code blocks
 	const codeBlockRegex = /```[\s\S]*?```/g;
 	const parts = text.split(codeBlockRegex);
 	const codeBlocks = text.match(codeBlockRegex) || [];
@@ -22,9 +27,9 @@ export function parseMarkdown(text: string): ParsedSegment[] {
 	while (partIndex < parts.length) {
 		const part = parts[partIndex];
 		
-		if (part) {
-			// Process inline formatting
-			segments.push(...parseInlineMarkdown(part));
+		if (part.trim()) {
+			// Process non-code content
+			segments.push(...parseInlineContent(part));
 		}
 		
 		// Add code block if there's one after this part
@@ -39,11 +44,127 @@ export function parseMarkdown(text: string): ParsedSegment[] {
 	return segments;
 }
 
-function parseInlineMarkdown(text: string): ParsedSegment[] {
+function parseInlineContent(text: string): ParsedSegment[] {
 	const segments: ParsedSegment[] = [];
 	
-	// Combined regex for bold, italic, inline code, links
-	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\\\[.*?\]\(.*?\))/g;
+	// Check for tables first
+	const tableRegex = /^\|.+\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)*)/gm;
+	let tableMatch;
+	while ((tableMatch = tableRegex.exec(text)) !== null) {
+		// Add content before table
+		const beforeTable = text.substring(0, tableMatch.index);
+		if (beforeTable.trim()) {
+			segments.push(...parseLines(beforeTable));
+		}
+		
+		// Parse table
+		const tableContent = tableMatch[0];
+		const tableSegments = parseTable(tableContent);
+		segments.push(...tableSegments);
+		
+		// Update text for next iteration
+		text = text.substring(tableMatch.index + tableContent.length);
+	}
+	
+	// Add remaining content
+	if (text.trim()) {
+		segments.push(...parseLines(text));
+	}
+	
+	return segments;
+}
+
+function parseTable(tableStr: string): ParsedSegment[] {
+	const lines = tableStr.trim().split('\n').filter(line => line.trim());
+	if (lines.length < 2) return [];
+	
+	// Skip separator line (|---|---|)
+	const dataLines = lines.filter(line => !line.match(/^[\|\s-]+$/));
+	if (dataLines.length < 2) return [];
+	
+	const headers = parseTableRow(dataLines[0]);
+	const rows = dataLines.slice(1).map(row => parseTableRow(row));
+	
+	return [{
+		type: 'table',
+		content: '',
+		headers,
+		rows
+	}];
+}
+
+function parseTableRow(row: string): string[] {
+	return row.split('|').map(cell => cell.trim()).filter(cell => cell !== '');
+}
+
+function parseLines(text: string): ParsedSegment[] {
+	const segments: ParsedSegment[] = [];
+	
+	// Combined regex for inline formatting
+	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g;
+	const lines = text.split('\n');
+	
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		
+		if (!line.trim()) {
+			// Empty line - add line break for paragraph separation
+			segments.push({ type: 'lineBreak', content: '' });
+			continue;
+		}
+		
+		// Check for headings
+		if (line.match(/^#{1,6}\s/)) {
+			segments.push({ type: 'heading', content: line.replace(/^#+\s/, '') });
+			continue;
+		}
+		
+		// Check for list items
+		if (line.match(/^[\-\*]\s/)) {
+			const listMatch = line.match(/^([\-\*])\s(.*)/);
+			if (listMatch) {
+				// Check if previous segment is a list
+				const lastSeg = segments[segments.length - 1];
+				if (lastSeg && lastSeg.type === 'list') {
+					lastSeg.items?.push(listMatch[2]);
+				} else {
+					segments.push({ type: 'list', content: '', items: [listMatch[2]] });
+				}
+			}
+			continue;
+		}
+		
+		// Check for numbered lists
+		if (line.match(/^\d+\.\s/)) {
+			const listMatch = line.match(/^\d+\.\s(.*)/);
+			if (listMatch) {
+				const lastSeg = segments[segments.length - 1];
+				if (lastSeg && lastSeg.type === 'list') {
+					lastSeg.items?.push(listMatch[1]);
+				} else {
+					segments.push({ type: 'list', content: '', items: [listMatch[1]] });
+				}
+			}
+			continue;
+		}
+		
+		// Process inline formatting
+		const inlineSegments = parseInlineElements(line);
+		segments.push(...inlineSegments);
+		
+		// Add line break after non-empty lines (except last in a paragraph)
+		if (i < lines.length - 1 && line.trim()) {
+			segments.push({ type: 'lineBreak', content: '' });
+		}
+	}
+	
+	return segments;
+}
+
+function parseInlineElements(text: string): ParsedSegment[] {
+	const segments: ParsedSegment[] = [];
+	
+	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g;
 	const parts = text.split(inlineRegex);
 	
 	for (const part of parts) {
@@ -60,30 +181,7 @@ function parseInlineMarkdown(text: string): ParsedSegment[] {
 			if (linkMatch) {
 				segments.push({ type: 'link', content: linkMatch[1] });
 			}
-		} else if (part.includes('\n')) {
-			// Handle newlines and lists
-			const lines = part.split('\n');
-			for (let i = 0; i < lines.length; i++) {
-				const line = lines[i];
-				if (line.match(/^[\-\*]\s/)) {
-					// List item
-					if (segments.length > 0 && segments[segments.length - 1].type === 'list') {
-						segments[segments.length - 1].items?.push(line.slice(2));
-					} else {
-						segments.push({ type: 'list', content: '', items: [line.slice(2)] });
-					}
-				} else if (line.match(/^#{1,6}\s/)) {
-					// Heading
-					segments.push({ type: 'text', content: line });
-				} else if (line) {
-					if (i > 0) {
-						segments.push({ type: 'text', content: '\n' + line });
-					} else {
-						segments.push({ type: 'text', content: line });
-					}
-				}
-			}
-		} else {
+		} else if (part) {
 			segments.push({ type: 'text', content: part });
 		}
 	}
