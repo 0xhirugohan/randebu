@@ -131,25 +131,38 @@ class ConversationalAgent:
             conversation_history: Optional list of previous messages
             
         Returns:
-            Dict with 'response' (the assistant's reply) and 'strategy_updated' (bool)
+            Dict with 'response' (the assistant's reply), 'thinking' (reasoning), and 'strategy_updated' (bool)
         """
-        # Execute agent using kickoff
+        # Execute agent using stream to capture both thinking and output
         try:
-            result = self.agent.kickoff(user_message)
+            # Use stream instead of kickoff to get thinking content
+            result = self.agent.stream(user_message)
+            
+            # In stream mode, result contains both output and thinking
+            # Extract thinking from the result if available
+            thinking = None
+            if hasattr(result, 'thinking') and result.thinking:
+                thinking = result.thinking
+            elif isinstance(result, dict) and 'thinking' in result:
+                thinking = result.get('thinking')
+            
+            # The actual response
+            result_str = str(result) if not isinstance(result, str) else result
             
             # Check if strategy was updated
-            result_str = str(result)
             strategy_updated = "update_trading_strategy" in result_str or \
                              "Successfully updated" in result_str
             
             return {
                 "response": result_str,
+                "thinking": thinking,
                 "strategy_updated": strategy_updated,
                 "success": True
             }
         except Exception as e:
             return {
                 "response": f"I encountered an error: {str(e)}. Please try again.",
+                "thinking": None,
                 "strategy_updated": False,
                 "success": False
             }

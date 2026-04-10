@@ -220,6 +220,7 @@ def chat(
 
     return BotChatResponse(
         response=assistant_content,
+        thinking=result.get("thinking"),
         strategy_config=bot.strategy_config if result.get("strategy_updated") else None,
         success=result.get("success", False),
     )

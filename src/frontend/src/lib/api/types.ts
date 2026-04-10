@@ -123,6 +123,7 @@ export interface BotChatRequest {
 
 export interface BotChatResponse {
 	response: string;
+	thinking: string | null;
 	strategy_config: StrategyConfig | null;
 	success: boolean;
 }

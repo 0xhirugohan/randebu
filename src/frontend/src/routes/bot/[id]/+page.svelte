@@ -9,6 +9,7 @@
 	let botId = $derived($page.params.id);
 	let isSending = $state(false);
 	let showStrategy = $state(false);
+	let thinkingContent = $state('');
 
 	onMount(async () => {
 		if (!$isAuthenticated && !$isLoading) {
@@ -43,6 +44,7 @@
 		if (isSending) return;
 		
 		isSending = true;
+		thinkingContent = '';
 
 		// Add user's message immediately so it shows even before API response
 		addMessage({ role: 'user', content: message });
@@ -55,6 +57,8 @@
 			const response = await api.bots.chat(botId, message, controller.signal);
 			clearTimeout(timeoutId);
 			
+			// Set thinking content for display
+			thinkingContent = response.thinking || '';
 			addMessage({ role: 'assistant', content: response.response });
 			
 			if (response.strategy_config) {
@@ -109,7 +113,8 @@
 			bot={$currentBotStore}
 			messages={$chatStore}
 			isThinking={isSending}
-		onSendMessage={handleSendMessage}
+			{thinkingContent}
+			onSendMessage={handleSendMessage}
 		/>
 	</div>
 

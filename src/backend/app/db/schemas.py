@@ -145,6 +145,7 @@ class BotChatRequest(BaseModel):
 
 class BotChatResponse(BaseModel):
     response: str
+    thinking: Optional[str] = None
     strategy_config: Optional[dict] = None
     success: bool = False
 
