@@ -10,8 +10,8 @@ Uses MiniMax extended thinking API for proper thinking/reasoning separation.
 
 import json
 import re
+import requests
 from typing import List, Optional, Dict, Any
-from openai import OpenAI
 
 from ...core.config import get_settings
 from ...db.models import Bot
@@ -64,13 +64,6 @@ class ConversationalAgent:
         self.model = model
         self.bot_id = bot_id
         
-        # Create OpenAI-compatible client for MiniMax
-        # Use the extended thinking endpoint
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.minimax.io/v1"
-        )
-        
         # Extended thinking endpoint
         self.thinking_endpoint = "https://api.minimax.io/v1/text/chatcompletion_v2"
     
@@ -98,8 +91,15 @@ class ConversationalAgent:
             messages.append({"role": "user", "content": user_message})
             
             # Make API call to extended thinking endpoint
-            response = self.client.post(
+            # Use requests library directly for this endpoint since it's not OpenAI-compatible
+            import requests
+            
+            resp = requests.post(
                 self.thinking_endpoint,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
                 json={
                     "model": self.model,
                     "messages": messages,
@@ -112,7 +112,7 @@ class ConversationalAgent:
                 }
             )
             
-            result = response.json()
+            result = resp.json()
             
             # Extract thinking from reasoning_content
             thinking = None
