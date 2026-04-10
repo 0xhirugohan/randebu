@@ -71,6 +71,47 @@ User: "Buy 0x6982508145454Ce125dDE157d8d64a26D53f60a2 when it drops 10%"
 }"""
 
 
+# Tool definitions for the agent
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_tokens",
+            "description": "Search for trending tokens on a blockchain. Use this when user asks for token recommendations, trending tokens, or wants to discover new tokens to trade.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chain": {
+                        "type": "string",
+                        "description": "The blockchain to search on. Supported: bsc, solana, eth, base",
+                        "enum": ["bsc", "solana", "eth", "base"]
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of tokens to return (default: 10)",
+                        "default": 10
+                    }
+                },
+                "required": ["chain"]
+            }
+        }
+    }
+]
+
+SYSTEM_PROMPT_WITH_TOOLS = SYSTEM_PROMPT + """
+
+You have access to tools:
+- search_tokens(chain, limit): Search for trending tokens on a blockchain. Use it when user asks for token recommendations or trending tokens.
+
+When you want to use a tool, respond with:
+{
+  "thinking": "...",
+  "response": "Searching for trending tokens...",
+  "tool_call": {"name": "search_tokens", "arguments": {"chain": "bsc", "limit": 10}}
+}
+"""
+
+
 class ConversationalAgent:
     def __init__(self, api_key: str, model: str = "MiniMax-M2.7", bot_id: str = None):
         self.api_key = api_key
@@ -92,7 +133,7 @@ class ConversationalAgent:
         """
         try:
             # Build messages array with system prompt and conversation history
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            messages = [{"role": "system", "content": SYSTEM_PROMPT_WITH_TOOLS}]
             
             # Add conversation history (last 10 messages)
             if conversation_history:
@@ -118,7 +159,8 @@ class ConversationalAgent:
                     "thinking": {
                         "type": "human",
                         "budget_tokens": 1500
-                    }
+                    },
+                    "tools": TOOLS
                 }
             )
             
@@ -157,6 +199,41 @@ class ConversationalAgent:
                     thinking_field = parsed.get("thinking", "")
                     response_text = parsed.get("response", content)
                     strategy_update = parsed.get("strategy_update")
+                    
+                    # Handle tool call
+                    tool_call = parsed.get("tool_call")
+                    if tool_call and tool_call.get("name") == "search_tokens":
+                        args = tool_call.get("arguments", {})
+                        chain = args.get("chain", "bsc")
+                        limit = args.get("limit", 10)
+                        
+                        # Execute the tool
+                        from ..ave.client import AveCloudClient
+                        from ...core.config import get_settings
+                        settings = get_settings()
+                        ave_client = AveCloudClient(
+                            api_key=settings.AVE_API_KEY,
+                            plan=settings.AVE_API_PLAN
+                        )
+                        import asyncio
+                        tokens = asyncio.run(ave_client.get_tokens(chain=chain, limit=limit))
+                        
+                        if tokens:
+                            # Format tokens for response
+                            token_list = ""
+                            for t in tokens[:limit]:
+                                addr = t.get("token", "")
+                                symbol = t.get("symbol", "")
+                                name = t.get("name", "")
+                                price_change = t.get("token_price_change_24h", "N/A")
+                                token_list += f"- **{symbol}** ({name}): `{addr}` - 24h change: {price_change}%\n"
+                            
+                            response_text = f"Here are the trending tokens on {chain.upper()}:\n\n{token_list}\nWould you like me to set up a strategy for any of these?"
+                        else:
+                            response_text = f"I couldn't find any trending tokens on {chain.upper()}. Try again later."
+                        
+                        strategy_update = None
+                        
                 except json.JSONDecodeError:
                     pass  # Use defaults
             
