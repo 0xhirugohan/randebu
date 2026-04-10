@@ -108,8 +108,8 @@
 		<ChatInterface
 			bot={$currentBotStore}
 			messages={$chatStore}
-			{isSending}
-			onSendMessage={handleSendMessage}
+			isThinking={isSending}
+		onSendMessage={handleSendMessage}
 		/>
 	</div>
 
