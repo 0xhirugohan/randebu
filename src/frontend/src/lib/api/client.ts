@@ -21,7 +21,20 @@ function getAuthHeaders(): HeadersInit {
 async function handleResponse<T>(response: Response): Promise<T> {
 	if (!response.ok) {
 		const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
-		throw new Error(error.detail || `HTTP error ${response.status}`);
+		let errorMessage = 'An error occurred';
+		
+		if (typeof error.detail === 'string') {
+			errorMessage = error.detail;
+		} else if (Array.isArray(error.detail)) {
+			// Handle FastAPI validation error format: [{type, loc, msg, input}]
+			errorMessage = error.detail.map((e: any) => e.msg || JSON.stringify(e)).join(', ');
+		} else if (error.message) {
+			errorMessage = error.message;
+		} else {
+			errorMessage = `HTTP error ${response.status}`;
+		}
+		
+		throw new Error(errorMessage);
 	}
 	return response.json();
 }
