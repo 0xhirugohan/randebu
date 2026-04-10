@@ -104,11 +104,12 @@ export const api = {
 			}
 		},
 
-		async chat(id: string, message: string): Promise<BotChatResponse> {
+		async chat(id: string, message: string, signal?: AbortSignal): Promise<BotChatResponse> {
 			const response = await fetch(`${API_URL}/bots/${id}/chat`, {
 				method: 'POST',
 				headers: getAuthHeaders(),
-				body: JSON.stringify({ message } as BotChatRequest)
+				body: JSON.stringify({ message } as BotChatRequest),
+				signal
 			});
 			return handleResponse<BotChatResponse>(response);
 		},
