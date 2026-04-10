@@ -133,13 +133,11 @@ class ConversationalAgent:
         Returns:
             Dict with 'response' (the assistant's reply), 'thinking' (reasoning), and 'strategy_updated' (bool)
         """
-        # Execute agent using stream to capture both thinking and output
+        # Execute agent using kickoff
         try:
-            # Use stream instead of kickoff to get thinking content
-            result = self.agent.stream(user_message)
+            result = self.agent.kickoff(user_message)
             
-            # In stream mode, result contains both output and thinking
-            # Extract thinking from the result if available
+            # Try to extract thinking from result if available
             thinking = None
             if hasattr(result, 'thinking') and result.thinking:
                 thinking = result.thinking
