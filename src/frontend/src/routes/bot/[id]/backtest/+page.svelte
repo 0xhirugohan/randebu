@@ -16,6 +16,15 @@
 	let selectedBacktest = $state<Backtest | null>(null);
 
 	onMount(async () => {
+		// Set default dates (yesterday to 30 days ago)
+		const yesterday = new Date();
+		yesterday.setDate(yesterday.getDate() - 1);
+		const thirtyDaysAgo = new Date();
+		thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+		
+		endDate = yesterday.toISOString().split('T')[0];
+		startDate = thirtyDaysAgo.toISOString().split('T')[0];
+		
 		if (!$isAuthenticated && !$isLoading) {
 			goto('/login');
 			return;
