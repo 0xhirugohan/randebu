@@ -1,11 +1,9 @@
 from typing import Optional, List, Dict, Any
 import httpx
-from crewai import LLM
 
 
-class MiniMaxLLM(LLM):
+class MiniMaxLLM:
     def __init__(self, api_key: str, model: str = "MiniMax-M2.7", **kwargs):
-        super().__init__(**kwargs)
         self.api_key = api_key
         self.model = model
         self.base_url = "https://api.minimax.io/v1"

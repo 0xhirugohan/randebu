@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
-from crewai import Agent, Task, Crew
-from .llm_connector import MiniMaxConnector, MiniMaxLLM
+from crewai import Agent, Task, Crew, LLM
+from .llm_connector import MiniMaxConnector
 from ...core.config import get_settings
 
 
@@ -141,7 +141,7 @@ def create_trading_designer_agent(
         role="Trading Strategy Designer",
         goal="Convert natural language trading requests into precise strategy configurations",
         backstory=system_prompt,
-        llm=MiniMaxLLM(api_key=api_key, model=model),
+        llm=LLM(model=model, api_key=api_key, api_base="https://api.minimax.io/v1"),
         verbose=True,
     )
 
@@ -155,7 +155,7 @@ def create_strategy_validator_agent(
         backstory="""You are a meticulous strategy validator with expertise in trading systems.
         You check that all required parameters are present, values are reasonable, and the 
         strategy makes logical sense. You never approve strategies with missing or invalid data.""",
-        llm=MiniMaxLLM(api_key=api_key, model=model),
+        llm=LLM(model=model, api_key=api_key, api_base="https://api.minimax.io/v1"),
         verbose=True,
     )
 
@@ -169,7 +169,7 @@ def create_strategy_explainer_agent(
         backstory="""You are a patient trading strategy explainer. You translate complex 
         strategy configurations into easy-to-understand language. You help users understand 
         exactly what their strategies will do when triggered.""",
-        llm=MiniMaxLLM(api_key=api_key, model=model),
+        llm=LLM(model=model, api_key=api_key, api_base="https://api.minimax.io/v1"),
         verbose=True,
     )
 
