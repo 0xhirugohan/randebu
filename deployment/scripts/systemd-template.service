@@ -10,6 +10,8 @@ Environment="PATH=/var/www/bot/src/backend/venv/bin"
 ExecStart=/var/www/bot/src/backend/venv/bin/python /var/www/bot/src/backend/run.py
 Restart=always
 RestartSec=10
+TimeoutStartSec=300
+TimeoutStopSec=300
 
 EnvironmentFile=/var/www/bot/data/.env
 
