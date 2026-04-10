@@ -6,6 +6,7 @@
 	interface Props {
 		bot: Bot | null;
 		messages: ChatMessage[];
+		isSending?: boolean;
 		onSendMessage: (message: string) => void;
 		onSelectBot?: (botId: string) => void;
 		availableBots?: Bot[];
@@ -15,6 +16,7 @@
 	let {
 		bot,
 		messages,
+		isSending = false,
 		onSendMessage,
 		onSelectBot,
 		availableBots = [],
@@ -132,6 +134,18 @@
 				</div>
 			</div>
 	{/each}
+
+		{#if isSending}
+			<div class="message assistant">
+				<div class="message-content">
+					<div class="typing">
+						<span class="dot"></span>
+						<span class="dot"></span>
+						<span class="dot"></span>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	{#if bot}

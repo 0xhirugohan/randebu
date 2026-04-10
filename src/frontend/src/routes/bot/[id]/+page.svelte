@@ -109,6 +109,7 @@
 		<ChatInterface
 			bot={$currentBotStore}
 			messages={$chatStore}
+			isSending={isSending}
 			onSendMessage={handleSendMessage}
 		/>
 	</div>
