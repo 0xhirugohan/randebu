@@ -140,7 +140,7 @@ export const api = {
 			const response = await fetch(`${API_URL}/bots/${botId}/backtest`, {
 				method: 'POST',
 				headers: getAuthHeaders(),
-				body: JSON.stringify(config)
+				body: JSON.stringify({ ...config, chain: 'bsc' })
 			});
 			return handleResponse<Backtest>(response);
 		},
