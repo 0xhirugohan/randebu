@@ -21,7 +21,7 @@ class MiniMaxLLM:
         }
         with httpx.Client(timeout=60.0) as client:
             response = client.post(
-                f"{self.base_url}/chat/completions",
+                f"{self.base_url}/text/chatcompletion_v2",
                 headers=headers,
                 json=payload,
             )
