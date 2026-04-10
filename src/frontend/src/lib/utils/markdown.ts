@@ -3,13 +3,13 @@
  * Supports: bold, italic, code blocks, inline code, links, lists, tables, headings, line breaks
  */
 
-interface InlineSegment {
+export interface InlineSegment {
 	type: 'text' | 'bold' | 'italic' | 'code' | 'link';
 	content: string;
 	href?: string;
 }
 
-interface ParsedSegment {
+export interface ParsedSegment {
 	type: 'text' | 'bold' | 'italic' | 'code' | 'codeBlock' | 'link' | 'list' | 'table' | 'lineBreak' | 'heading';
 	content: string;
 	items?: string[];
@@ -106,7 +106,7 @@ function parseTableRow(row: string): InlineSegment[][] {
 		.map(cell => parseInlineElements(cell));
 }
 
-function parseInlineElements(text: string): InlineSegment[] {
+export function parseInlineElements(text: string): InlineSegment[] {
 	const segments: InlineSegment[] = [];
 	
 	const inlineRegex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[.*?\]\(.*?\))/g;
