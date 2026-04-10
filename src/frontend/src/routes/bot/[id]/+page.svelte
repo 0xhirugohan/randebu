@@ -44,6 +44,9 @@
 		
 		isSending = true;
 
+		// Add user's message immediately
+		addMessage({ role: 'user', content: message });
+
 		try {
 			const response = await api.bots.chat(botId, message);
 			addMessage({ role: 'assistant', content: response.response });
