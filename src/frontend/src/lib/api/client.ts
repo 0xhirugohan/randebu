@@ -41,7 +41,7 @@ export const api = {
 			const response = await fetch(`${API_URL}/auth/login`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ email, password })
+				body: JSON.stringify({ username: email, password })
 			});
 			return handleResponse<AuthResponse>(response);
 		},
