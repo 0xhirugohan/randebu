@@ -134,6 +134,19 @@ function parseInlineElements(text: string): InlineSegment[] {
 	return segments;
 }
 
+// Render inline segments to HTML string
+function renderInlineSegments(segments: InlineSegment[]): string {
+	return segments.map(seg => {
+		switch (seg.type) {
+			case 'bold': return `<strong>${seg.content}</strong>`;
+			case 'italic': return `<em>${seg.content}</em>`;
+			case 'code': return `<code class="inline-code">${seg.content}</code>`;
+			case 'link': return `<a href="${seg.href || '#'}" target="_blank" rel="noopener noreferrer">${seg.content}</a>`;
+			default: return seg.content;
+		}
+	}).join('');
+}
+
 function parseLines(text: string): ParsedSegment[] {
 	const segments: ParsedSegment[] = [];
 	
@@ -160,12 +173,16 @@ function parseLines(text: string): ParsedSegment[] {
 		if (line.match(/^[\-\*]\s/)) {
 			const listMatch = line.match(/^([\-\*])\s(.*)/);
 			if (listMatch) {
+				// Parse inline formatting for list item
+				const itemContent = listMatch[2];
+				const inlineSegments = parseInlineElements(itemContent);
+				
 				// Check if previous segment is a list
 				const lastSeg = segments[segments.length - 1];
 				if (lastSeg && lastSeg.type === 'list') {
-					lastSeg.items?.push(listMatch[2]);
+					lastSeg.items?.push(itemContent);
 				} else {
-					segments.push({ type: 'list', content: '', items: [listMatch[2]] });
+					segments.push({ type: 'list', content: '', items: [itemContent] });
 				}
 			}
 			continue;
@@ -175,11 +192,13 @@ function parseLines(text: string): ParsedSegment[] {
 		if (line.match(/^\d+\.\s/)) {
 			const listMatch = line.match(/^\d+\.\s(.*)/);
 			if (listMatch) {
+				const itemContent = listMatch[1];
+				
 				const lastSeg = segments[segments.length - 1];
 				if (lastSeg && lastSeg.type === 'list') {
-					lastSeg.items?.push(listMatch[1]);
+					lastSeg.items?.push(itemContent);
 				} else {
-					segments.push({ type: 'list', content: '', items: [listMatch[1]] });
+					segments.push({ type: 'list', content: '', items: [itemContent] });
 				}
 			}
 			continue;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Bot } from '$lib/api';
 	import type { ChatMessage } from '$lib/stores/chatStore';
-	import { parseMarkdown } from '$lib/utils/markdown';
+	import { parseMarkdown, parseInlineElements, type InlineSegment } from '$lib/utils/markdown';
 
 	interface Props {
 		bot: Bot | null;
@@ -62,6 +62,18 @@
 	function renderContent(content: string) {
 		return parseMarkdown(content);
 	}
+
+	function renderInline(segments: InlineSegment[]): string {
+		return segments.map(seg => {
+			switch (seg.type) {
+				case 'bold': return `<strong>${seg.content}</strong>`;
+				case 'italic': return `<em>${seg.content}</em>`;
+				case 'code': return `<code class="inline-code">${seg.content}</code>`;
+				case 'link': return `<a href="${seg.href || '#'}" target="_blank" rel="noopener noreferrer">${seg.content}</a>`;
+				default: return seg.content;
+			}
+		}).join('');
+	}
 </script>
 
 <div class="chat-interface">
@@ -121,7 +133,7 @@
 						{:else if segment.type === 'list' && segment.items}
 							<ul>
 								{#each segment.items as item}
-									<li>{item}</li>
+									<li>{@html renderInline(parseInlineElements(item))}</li>
 								{/each}
 							</ul>
 						{:else if segment.type === 'table' && segment.headers && segment.rows}
