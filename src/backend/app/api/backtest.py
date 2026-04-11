@@ -207,7 +207,11 @@ def get_backtest_trades(
 
     # Get trades from result
     result = backtest.result or {}
-    trades = result.get("trades", [])
+    # Handle case where result might be a JSON string
+    if isinstance(result, str):
+        import json
+        result = json.loads(result)
+    trades = result.get("trades", []) or []
     
     return {
         "backtest_id": run_id,
