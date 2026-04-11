@@ -19,6 +19,11 @@
 	// Expandable trades state
 	let expandedTrades = $state<Set<string>>(new Set());
 	
+	// Pagination state for each backtest
+	let tradesPage = $state<Record<string, number>>({});
+	let tradesData = $state<Record<string, any>>({});
+	const TRADES_PER_PAGE = 5;
+	
 	onMount(async () => {
 		// Set default dates - yesterday only (1 day range for fast testing)
 		const yesterday = new Date();
@@ -132,8 +137,36 @@
 			expandedTrades.delete(backtestId);
 		} else {
 			expandedTrades.add(backtestId);
+			// Load first page of trades if not loaded
+			if (!tradesData[backtestId]) {
+				loadTrades(backtestId, 1);
+			}
 		}
 		expandedTrades = new Set(expandedTrades);  // Trigger reactivity
+	}
+	
+	async function loadTrades(backtestId: string, page: number) {
+		try {
+			const data = await api.backtest.getTrades(botId, backtestId, page, TRADES_PER_PAGE);
+			tradesData[backtestId] = { ...data, currentPage: page };
+			tradesData = { ...tradesData };  // Trigger reactivity
+		} catch (e) {
+			console.error('Failed to load trades:', e);
+		}
+	}
+	
+	function nextTradesPage(backtestId: string) {
+		const data = tradesData[backtestId];
+		if (data && data.has_next) {
+			loadTrades(backtestId, data.page + 1);
+		}
+	}
+	
+	function prevTradesPage(backtestId: string) {
+		const data = tradesData[backtestId];
+		if (data && data.has_prev) {
+			loadTrades(backtestId, data.page - 1);
+		}
 	}
 </script>
 
@@ -244,18 +277,34 @@
 									</button>
 									{#if expandedTrades.has(backtest.id)}
 										<div class="trades-inline">
-											<div class="trades-list">
-												{#each backtest.result.trades as trade}
-													<div class="trade-item">
-														<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
-															{trade.type.toUpperCase()}
-														</span>
-														<span class="trade-price">${trade.price?.toFixed(6)}</span>
-														<span class="trade-amount">${trade.amount?.toFixed(2)}</span>
-														<span class="trade-reason">{trade.exit_reason || 'entry'}</span>
-													</div>
-												{/each}
-											</div>
+											{#if tradesData[backtest.id]}
+												<div class="trades-pagination-header">
+													<span class="trades-count">
+														Showing {((tradesData[backtest.id].page - 1) * TRADES_PER_PAGE) + 1}-{Math.min(tradesData[backtest.id].page * TRADES_PER_PAGE, tradesData[backtest.id].total_trades)} of {tradesData[backtest.id].total_trades}
+													</span>
+													{#if tradesData[backtest.id].total_pages > 1}
+														<div class="pagination-controls">
+															<button class="btn-pagination" onclick={() => prevTradesPage(backtest.id)} disabled={!tradesData[backtest.id].has_prev}>← Prev</button>
+															<span class="page-indicator">Page {tradesData[backtest.id].page} of {tradesData[backtest.id].total_pages}</span>
+															<button class="btn-pagination" onclick={() => nextTradesPage(backtest.id)} disabled={!tradesData[backtest.id].has_next}>Next →</button>
+														</div>
+													{/if}
+												</div>
+												<div class="trades-list">
+													{#each tradesData[backtest.id].trades as trade}
+														<div class="trade-item">
+															<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
+																{trade.type.toUpperCase()}
+															</span>
+															<span class="trade-price">${trade.price?.toFixed(6)}</span>
+															<span class="trade-amount">${trade.amount?.toFixed(2)}</span>
+															<span class="trade-reason">{trade.exit_reason || 'entry'}</span>
+														</div>
+													{/each}
+												</div>
+											{:else}
+												<div class="trades-loading">Loading trades...</div>
+											{/if}
 										</div>
 									{/if}
 								{/if}
@@ -783,5 +832,62 @@
 	.close-btn:hover {
 		background: rgba(255, 255, 255, 0.2);
 		color: #fff;
+	}
+
+	/* Pagination styles */
+	.trades-pagination-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.75rem;
+		padding-bottom: 0.5rem;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.trades-count {
+		font-size: 0.85rem;
+		color: #888;
+	}
+
+	.pagination-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.btn-pagination {
+		width: auto;
+		padding: 0.35rem 0.75rem;
+		background: rgba(102, 126, 234, 0.1);
+		border: 1px solid rgba(102, 126, 234, 0.3);
+		border-radius: 6px;
+		color: #667eea;
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn-pagination:hover:not(:disabled) {
+		background: rgba(102, 126, 234, 0.2);
+		transform: none;
+	}
+
+	.btn-pagination:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.page-indicator {
+		font-size: 0.8rem;
+		color: #888;
+		min-width: 80px;
+		text-align: center;
+	}
+
+	.trades-loading {
+		text-align: center;
+		color: #888;
+		padding: 1rem;
+		font-size: 0.9rem;
 	}
 </style>

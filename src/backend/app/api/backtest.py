@@ -181,10 +181,17 @@ def get_backtest(
 def get_backtest_trades(
     bot_id: str,
     run_id: str,
+    page: int = 1,
+    per_page: int = 5,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get trade history for a specific backtest."""
+    """Get paginated trade history for a specific backtest.
+    
+    Args:
+        page: Page number (1-indexed)
+        per_page: Number of trades per page (default 5, max 20)
+    """
     bot = db.query(Bot).filter(Bot.id == bot_id).first()
     if not bot:
         raise HTTPException(
@@ -211,12 +218,30 @@ def get_backtest_trades(
     if isinstance(result, str):
         import json
         result = json.loads(result)
-    trades = result.get("trades", []) or []
+    all_trades = result.get("trades", []) or []
+    total_trades = len(all_trades)
+    
+    # Validate pagination params
+    per_page = min(max(per_page, 1), 20)  # Clamp between 1 and 20
+    page = max(page, 1)
+    
+    # Calculate pagination
+    total_pages = max(1, (total_trades + per_page - 1) // per_page) if total_trades > 0 else 1
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    # Get page of trades (return empty list if start_idx >= total_trades)
+    paginated_trades = all_trades[start_idx:end_idx] if start_idx < total_trades else []
     
     return {
         "backtest_id": run_id,
-        "trades": trades,
-        "total_trades": len(trades),
+        "trades": paginated_trades,
+        "total_trades": total_trades,
+        "page": page,
+        "per_page": per_page,
+        "total_pages": total_pages,
+        "has_next": page < total_pages,
+        "has_prev": page > 1,
     }
 
 @router.get("/bots/{bot_id}/backtests", response_model=List[BacktestResponse])

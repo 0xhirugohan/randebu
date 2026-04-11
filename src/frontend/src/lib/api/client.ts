@@ -169,8 +169,16 @@ export const api = {
 			}
 		},
 
-		async getTrades(botId: string, runId: string): Promise<{ trades: any[]; total_trades: number }> {
-			const response = await fetch(`${API_URL}/bots/${botId}/backtest/${runId}/trades`, {
+		async getTrades(botId: string, runId: string, page: number = 1, perPage: number = 5): Promise<{
+			trades: any[];
+			total_trades: number;
+			page: number;
+			per_page: number;
+			total_pages: number;
+			has_next: boolean;
+			has_prev: boolean;
+		}> {
+			const response = await fetch(`${API_URL}/bots/${botId}/backtest/${runId}/trades?page=${page}&per_page=${perPage}`, {
 				headers: getAuthHeaders()
 			});
 			if (!response.ok) {

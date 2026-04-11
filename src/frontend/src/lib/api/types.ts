@@ -89,6 +89,26 @@ export interface BacktestResult {
 	sharpe_ratio: number;
 }
 
+export interface PaginatedTrades {
+	trades: Trade[];
+	total_trades: number;
+	page: number;
+	per_page: number;
+	total_pages: number;
+	has_next: boolean;
+	has_prev: boolean;
+}
+
+export interface Trade {
+	type: 'buy' | 'sell';
+	token: string;
+	price: number;
+	amount: number;
+	quantity: number;
+	timestamp: number;
+	exit_reason?: 'stop_loss' | 'take_profit' | string;
+}
+
 export interface Simulation {
 	id: string;
 	bot_id: string;
