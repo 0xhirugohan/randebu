@@ -271,6 +271,17 @@
 										<span class="result-value negative">{backtest.result.max_drawdown.toFixed(2)}%</span>
 									</div>
 								</div>
+								<div class="backtest-config">
+									<span class="config-item">
+										<span class="config-label">Token:</span> {backtest.config.token || 'Unknown'}
+									</span>
+									<span class="config-item">
+										<span class="config-label">TF:</span> {backtest.config.timeframe || '1h'}
+									</span>
+									<span class="config-item">
+										<span class="config-label">Period:</span> {backtest.config.start_date} to {backtest.config.end_date}
+									</span>
+								</div>
 								{#if backtest.result.trades && backtest.result.trades.length > 0}
 									<button class="btn-toggle-trades" onclick={() => toggleTrades(backtest.id)}>
 										{expandedTrades.has(backtest.id) ? 'Hide' : 'Show'} Trade History ({backtest.result.trades.length})
@@ -740,6 +751,24 @@
 		display: grid;
 		grid-template-columns: repeat(4, 1fr);
 		gap: 1rem;
+	}
+
+	.backtest-config {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+		margin-top: 0.75rem;
+		padding: 0.5rem 0;
+		border-top: 1px solid rgba(255, 255, 255, 0.05);
+	}
+
+	.config-item {
+		font-size: 0.8rem;
+		color: #888;
+	}
+
+	.config-label {
+		color: #666;
 	}
 
 	.result-item {
