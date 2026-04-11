@@ -68,7 +68,8 @@
 		try {
 			const simulation = await api.simulate.start(botId, {
 				token: tokenAddress,
-				interval_seconds: intervalSeconds,
+				chain: 'bsc',
+				check_interval: intervalSeconds,
 				auto_execute: autoExecute
 			});
 			setCurrentSimulation(simulation);
