@@ -10,6 +10,7 @@
 	let tokenName = $state('');
 	let tokenAddress = $state('');
 	let intervalSeconds = $state(60);
+	let durationSeconds = $state(300);  // 5 minutes default
 	let autoExecute = $state(false);
 	let isRunning = $state(false);
 
@@ -70,6 +71,7 @@
 				token: tokenAddress,
 				chain: 'bsc',
 				check_interval: intervalSeconds,
+				duration_seconds: durationSeconds,
 				auto_execute: autoExecute
 			});
 			setCurrentSimulation(simulation);
@@ -132,12 +134,23 @@
 						</div>
 					</div>
 					<div class="field">
-						<label for="interval">Check Interval (seconds)</label>
-						<select id="interval" bind:value={intervalSeconds} disabled={isRunning}>
-							<option value={30}>30 seconds</option>
-							<option value={60}>60 seconds</option>
-							<option value={120}>2 minutes</option>
+						<label for="duration">Duration</label>
+						<select id="duration" bind:value={durationSeconds} disabled={isRunning}>
+							<option value={60}>1 minute</option>
 							<option value={300}>5 minutes</option>
+							<option value={600}>10 minutes</option>
+							<option value={1800}>30 minutes</option>
+						</select>
+					</div>
+				</div>
+
+				<div class="form-row">
+					<div class="field">
+						<label for="interval">Check Interval</label>
+						<select id="interval" bind:value={intervalSeconds} disabled={isRunning}>
+							<option value={10}>Every 10 seconds</option>
+							<option value={30}>Every 30 seconds</option>
+							<option value={60}>Every minute</option>
 						</select>
 					</div>
 				</div>

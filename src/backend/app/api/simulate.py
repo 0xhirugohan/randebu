@@ -22,6 +22,7 @@ def run_simulation_sync(
     simulation_id: str, db_url: str, bot_id: str, config: Dict[str, Any]
 ):
     import asyncio
+    import time
     from ..services.simulate.engine import SimulateEngine
     from ..core.database import SessionLocal
 
@@ -29,8 +30,44 @@ def run_simulation_sync(
         engine = SimulateEngine(config)
         engine.run_id = simulation_id
         running_simulations[simulation_id] = engine
+        
+        def save_signals_to_db():
+            """Save current signals to database."""
+            db = SessionLocal()
+            try:
+                simulation = (
+                    db.query(Simulation).filter(Simulation.id == simulation_id).first()
+                )
+                if simulation:
+                    simulation.signals = engine.signals
+                    db.commit()
+            finally:
+                db.close()
+        
         try:
-            results = await engine.run()
+            # Run engine in background with periodic signal saving
+            check_interval = config.get("check_interval", 60)
+            save_interval = min(check_interval, 30)  # Save at least every 30 seconds
+            
+            async def run_with_periodic_save():
+                last_save_time = time.time()
+                while engine.running and engine.status == "running":
+                    await asyncio.sleep(1)  # Check every second
+                    
+                    current_time = time.time()
+                    if current_time - last_save_time >= save_interval:
+                        save_signals_to_db()
+                        last_save_time = current_time
+                
+                # Final save when done
+                save_signals_to_db()
+            
+            # Run both the engine and periodic save concurrently
+            await asyncio.gather(
+                engine.run(),
+                run_with_periodic_save()
+            )
+            
             db = SessionLocal()
             try:
                 simulation = (
