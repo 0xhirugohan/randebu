@@ -280,6 +280,7 @@
 						<h3>Trade History</h3>
 						<button class="close-btn" onclick={() => showTradesModal = false}>×</button>
 					</div>
+					<div class="debug-info">selectedTrades.length = {selectedTrades.length}, loadingTrades = {loadingTrades}</div>
 					{#if loadingTrades}
 						<p class="loading">Loading trades...</p>
 					{:else if selectedTrades.length === 0}
@@ -417,6 +418,14 @@
 	.trades-modal h3 {
 		margin: 0;
 		color: #667eea;
+	}
+
+	.debug-info {
+		background: yellow;
+		color: black;
+		padding: 0.5rem;
+		margin-bottom: 1rem;
+		font-family: monospace;
 	}
 
 	.trades-table-wrapper {
