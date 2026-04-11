@@ -17,9 +17,6 @@
 	let selectedBacktest = $state<Backtest | null>(null);
 	
 	// Trades modal state
-	let showTradesModal = $state(false);
-	let selectedTrades = $state<any[]>([]);
-	let loadingTrades = $state(false);
 
 	onMount(async () => {
 		// Set default dates - yesterday only (1 day range for fast testing)
@@ -117,22 +114,7 @@
 		}
 	}
 
-	async function viewTrades(backtest: Backtest) {
-		console.log('viewTrades called', backtest.id);
-		showTradesModal = true;
-		loadingTrades = true;
-		try {
-			const response = await api.backtest.getTrades(botId, backtest.id);
-			console.log('Trades response:', response);
-			selectedTrades = response.trades || [];
-			console.log('selectedTrades set to:', selectedTrades.length, 'trades');
-		} catch (e) {
-			console.error('Failed to load trades:', e);
-			selectedTrades = [];
-		} finally {
-			loadingTrades = false;
-		}
-	}
+
 
 	function setBacktestHistory(backtests: any[]) {
 		backtestStore.update(state => ({ ...state, backtestHistory: backtests }));
@@ -245,8 +227,7 @@
 										<span class="result-label">Max Drawdown</span>
 										<span class="result-value negative">{backtest.result.max_drawdown.toFixed(2)}%</span>
 									</div>
-									<button onclick={() => viewTrades(backtest)} class="btn btn-secondary btn-sm">View Trades</button>
-								</div>
+											</div>
 							{/if}
 							{#if backtest.status === 'running'}
 								<div class="progress-container">
@@ -273,21 +254,7 @@
 			</section>
 		{/if}
 
-		{#if showTradesModal}
-			<div class="modal-overlay" onclick={() => showTradesModal = false}>
-				<div class="modal-content trades-modal" onclick={(e) => e.stopPropagation()}>
-					<div class="modal-header">
-						<h3>Trade History</h3>
-						<button class="close-btn" onclick={() => showTradesModal = false}>×</button>
-					</div>
-					{#if loadingTrades}
-						<p>Loading trades...</p>
-					{:else}
-						<pre>Debug: {JSON.stringify(selectedTrades)}</pre>
-					{/if}
-				</div>
-			</div>
-		{/if}
+
 	</div>
 </main>
 
@@ -572,6 +539,67 @@
 		background: rgba(0, 0, 0, 0.2);
 		border-radius: 8px;
 		padding: 1rem;
+	}
+
+	/* Inline Trades */
+	.trades-inline {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.trades-inline h4 {
+		margin: 0 0 0.5rem;
+		font-size: 0.9rem;
+		color: #667eea;
+	}
+
+	.trades-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.trade-item {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
+		background: rgba(255, 255, 255, 0.03);
+		border-radius: 6px;
+		font-size: 0.85rem;
+	}
+
+	.trade-item .trade-type {
+		padding: 0.2rem 0.5rem;
+		border-radius: 4px;
+		font-weight: 600;
+		font-size: 0.75rem;
+	}
+
+	.trade-item .trade-type.buy {
+		background: rgba(76, 175, 80, 0.2);
+		color: #4caf50;
+	}
+
+	.trade-item .trade-type.sell {
+		background: rgba(244, 67, 54, 0.2);
+		color: #f44336;
+	}
+
+	.trade-price {
+		color: #ccc;
+		font-family: monospace;
+	}
+
+	.trade-amount {
+		color: #888;
+	}
+
+	.trade-reason {
+		color: #666;
+		font-size: 0.8rem;
+		margin-left: auto;
 	}
 
 	.backtest-header {
