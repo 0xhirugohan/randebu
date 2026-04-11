@@ -124,6 +124,19 @@ async def start_simulation(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
         )
 
+    # Check if there's already a running simulation for this bot
+    existing_simulation = (
+        db.query(Simulation)
+        .filter(Simulation.bot_id == bot_id, Simulation.status == "running")
+        .first()
+    )
+    if existing_simulation:
+        # Return existing running simulation
+        if existing_simulation.id in running_simulations:
+            engine = running_simulations[existing_simulation.id]
+            existing_simulation.signals = engine.get_signals()
+        return existing_simulation
+
     settings = get_settings()
     simulation_id = str(uuid.uuid4())
 
@@ -135,9 +148,8 @@ async def start_simulation(
         "bot_id": bot_id,
         "token": config.token,
         "chain": config.chain,
-        "duration_seconds": config.duration_seconds,
         "check_interval": check_interval,
-        "auto_execute": config.auto_execute,
+        "auto_execute": False,  # Always paper trade
         "strategy_config": bot.strategy_config,
         "ave_api_key": settings.AVE_API_KEY,
         "ave_api_plan": settings.AVE_API_PLAN,

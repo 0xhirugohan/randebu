@@ -59,10 +59,9 @@ class SimulateEngine:
             self.results = {"error": "Token ID is required"}
             return self.results
 
-        end_time = datetime.utcnow().timestamp() + self.duration_seconds
-
+        # Run forever until stopped (no end_time limit)
         try:
-            while self.running and datetime.utcnow().timestamp() < end_time:
+            while self.running:
                 try:
                     price_data = await self.ave_client.get_token_price(token_id)
                     if price_data:
@@ -87,10 +86,8 @@ class SimulateEngine:
                         break
                     await asyncio.sleep(1)
 
-            if self.running:
-                self.status = "completed"
-            else:
-                self.status = "stopped"
+            # Simulation was stopped
+            self.status = "stopped"
 
         except Exception as e:
             self.status = "failed"

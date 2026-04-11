@@ -4,14 +4,12 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, currentBotStore, setCurrentBot, simulationStore, setCurrentSimulation, addSignals, clearSignals, setSimulationLoading, setSimulationError } from '$lib/stores';
 	import { api } from '$lib/api';
-	import { SignalChart, ProUpgradeBanner } from '$lib/components';
+	import { SignalChart } from '$lib/components';
 
 	let botId = $derived($page.params.id);
 	let tokenName = $state('');
 	let tokenAddress = $state('');
 	let intervalSeconds = $state(60);
-	let durationSeconds = $state(300);  // 5 minutes default
-	let autoExecute = $state(false);
 	let isRunning = $state(false);
 
 	onMount(async () => {
@@ -70,9 +68,7 @@
 			const simulation = await api.simulate.start(botId, {
 				token: tokenAddress,
 				chain: 'bsc',
-				check_interval: intervalSeconds,
-				duration_seconds: durationSeconds,
-				auto_execute: autoExecute
+				check_interval: intervalSeconds
 			});
 			setCurrentSimulation(simulation);
 			clearSignals();
@@ -134,30 +130,13 @@
 						</div>
 					</div>
 					<div class="field">
-						<label for="duration">Duration</label>
-						<select id="duration" bind:value={durationSeconds} disabled={isRunning}>
-							<option value={60}>1 minute</option>
-							<option value={300}>5 minutes</option>
-							<option value={600}>10 minutes</option>
-							<option value={1800}>30 minutes</option>
-						</select>
-					</div>
-				</div>
-
-				<div class="form-row">
-					<div class="field">
 						<label for="interval">Check Interval</label>
 						<select id="interval" bind:value={intervalSeconds} disabled={isRunning}>
 							<option value={10}>Every 10 seconds</option>
-							<option value={30}>Every 30 seconds</option>
+							<<option value={30}>Every 30 seconds</option>
 							<option value={60}>Every minute</option>
 						</select>
 					</div>
-				</div>
-
-				<div class="field checkbox-field">
-					<input type="checkbox" id="autoExecute" bind:checked={autoExecute} disabled={isRunning} />
-					<label for="autoExecute">Auto-execute trades (requires Pro tier)</label>
 				</div>
 
 				{#if isRunning}
@@ -171,8 +150,6 @@
 				{/if}
 			</form>
 		</section>
-
-		<ProUpgradeBanner feature="Real-time WebSocket signals for instant trading decisions" />
 
 		<section class="signals-section">
 			<h2>Signals ({$simulationStore.signals.length})</h2>
