@@ -225,10 +225,27 @@
 									</div>
 									<div class="result-item">
 										<span class="result-label">Max Drawdown</span>
-										<span class="result-value negative">{backtest.result.max_drawdown.toFixed(2)}%</span>
+								<span class="result-value negative">{backtest.result.max_drawdown.toFixed(2)}%</span>
+							</div>
+						</div>
+					</div>
+					{#if backtest.result.trades && backtest.result.trades.length > 0}
+						<div class="trades-inline">
+							<h4>Trade History</h4>
+							<div class="trades-list">
+								{#each backtest.result.trades as trade}
+									<div class="trade-item">
+										<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
+											{trade.type.toUpperCase()}
+										</span>
+										<span class="trade-price">${trade.price?.toFixed(6)}</span>
+										<span class="trade-amount">${trade.amount?.toFixed(2)}</span>
+										<span class="trade-reason">{trade.exit_reason || 'entry'}</span>
 									</div>
-											</div>
-							{/if}
+								{/each}
+							</div>
+						</div>
+					{/if}
 							{#if backtest.status === 'running'}
 								<div class="progress-container">
 									<div class="progress-bar">
