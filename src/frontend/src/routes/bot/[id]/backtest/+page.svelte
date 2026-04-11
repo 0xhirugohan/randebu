@@ -16,8 +16,9 @@
 	let isRunning = $state(false);
 	let selectedBacktest = $state<Backtest | null>(null);
 	
-	// Trades modal state
-
+	// Expandable trades state
+	let expandedTrades = $state<Set<string>>(new Set());
+	
 	onMount(async () => {
 		// Set default dates - yesterday only (1 day range for fast testing)
 		const yesterday = new Date();
@@ -125,6 +126,15 @@
 			selectedBacktest = backtest;
 		}
 	}
+
+	function toggleTrades(backtestId: string) {
+		if (expandedTrades.has(backtestId)) {
+			expandedTrades.delete(backtestId);
+		} else {
+			expandedTrades.add(backtestId);
+		}
+		expandedTrades = new Set(expandedTrades);  // Trigger reactivity
+	}
 </script>
 
 <svelte:head>
@@ -229,21 +239,25 @@
 									</div>
 								</div>
 								{#if backtest.result.trades && backtest.result.trades.length > 0}
-									<div class="trades-inline">
-										<h4>Trade History</h4>
-										<div class="trades-list">
-											{#each backtest.result.trades as trade}
-												<div class="trade-item">
-													<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
-														{trade.type.toUpperCase()}
-													</span>
-													<span class="trade-price">${trade.price?.toFixed(6)}</span>
-													<span class="trade-amount">${trade.amount?.toFixed(2)}</span>
-													<span class="trade-reason">{trade.exit_reason || 'entry'}</span>
-												</div>
-											{/each}
+									<button class="btn-toggle-trades" onclick={() => toggleTrades(backtest.id)}>
+										{expandedTrades.has(backtest.id) ? 'Hide' : 'Show'} Trade History ({backtest.result.trades.length})
+									</button>
+									{#if expandedTrades.has(backtest.id)}
+										<div class="trades-inline">
+											<div class="trades-list">
+												{#each backtest.result.trades as trade}
+													<div class="trade-item">
+														<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
+															{trade.type.toUpperCase()}
+														</span>
+														<span class="trade-price">${trade.price?.toFixed(6)}</span>
+														<span class="trade-amount">${trade.amount?.toFixed(2)}</span>
+														<span class="trade-reason">{trade.exit_reason || 'entry'}</span>
+													</div>
+												{/each}
+											</div>
 										</div>
-									</div>
+									{/if}
 								{/if}
 							{/if}
 							{#if backtest.status === 'running'}
@@ -615,6 +629,22 @@
 		color: #666;
 		font-size: 0.8rem;
 		margin-left: auto;
+	}
+
+	.btn-toggle-trades {
+		margin-top: 0.75rem;
+		padding: 0.5rem 1rem;
+		background: rgba(102, 126, 234, 0.1);
+		border: 1px solid rgba(102, 126, 234, 0.3);
+		border-radius: 6px;
+		color: #667eea;
+		font-size: 0.85rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.btn-toggle-trades:hover {
+		background: rgba(102, 126, 234, 0.2);
 	}
 
 	.backtest-header {
