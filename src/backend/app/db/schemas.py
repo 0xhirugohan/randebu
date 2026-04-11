@@ -69,6 +69,7 @@ class BotResponse(BaseModel):
 
 class BacktestCreate(BaseModel):
     token: str
+    token_name: Optional[str] = None
     chain: str
     timeframe: str
     start_date: str

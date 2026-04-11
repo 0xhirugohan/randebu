@@ -72,6 +72,7 @@ export interface Backtest {
 
 export interface BacktestConfig {
 	token: string;
+	token_name?: string;
 	chain: string;
 	timeframe: string;
 	start_date: string;
