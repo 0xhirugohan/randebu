@@ -177,7 +177,43 @@ def get_backtest(
     return backtest
 
 
-@router.get("/bots/{bot_id}/backtests", response_model=List[BacktestResponse])
+@router.get("/bots/{bot_id}/backtest/{run_id}/trades")
+def get_backtest_trades(
+    bot_id: str,
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get trade history for a specific backtest."""
+    bot = db.query(Bot).filter(Bot.id == bot_id).first()
+    if not bot:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Bot not found"
+        )
+    if bot.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
+        )
+
+    backtest = (
+        db.query(Backtest)
+        .filter(Backtest.id == run_id, Backtest.bot_id == bot_id)
+        .first()
+    )
+    if not backtest:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found"
+        )
+
+    # Get trades from result
+    result = backtest.result or {}
+    trades = result.get("trades", [])
+    
+    return {
+        "backtest_id": run_id,
+        "trades": trades,
+        "total_trades": len(trades),
+    }@router.get("/bots/{bot_id}/backtests", response_model=List[BacktestResponse])
 def list_backtests(
     bot_id: str,
     current_user: User = Depends(get_current_user),

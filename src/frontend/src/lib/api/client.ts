@@ -167,6 +167,16 @@ export const api = {
 			if (!response.ok) {
 				throw new Error(`HTTP error ${response.status}`);
 			}
+		},
+
+		async getTrades(botId: string, runId: string): Promise<{ trades: any[]; total_trades: number }> {
+			const response = await fetch(`${API_URL}/bots/${botId}/backtest/${runId}/trades`, {
+				headers: getAuthHeaders()
+			});
+			if (!response.ok) {
+				throw new Error(`HTTP error ${response.status}`);
+			}
+			return response.json();
 		}
 	},
 

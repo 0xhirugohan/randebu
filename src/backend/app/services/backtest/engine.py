@@ -393,6 +393,7 @@ class BacktestEngine:
             "sharpe_ratio": round(sharpe_ratio, 2),
             "final_balance": round(final_balance, 2),
             "signals": self.signals,
+            "trades": self.trades,  # Include trades in results for storage
         }
 
     async def stop(self):

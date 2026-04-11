@@ -15,6 +15,11 @@
 	let endDate = $state('');
 	let isRunning = $state(false);
 	let selectedBacktest = $state<Backtest | null>(null);
+	
+	// Trades modal state
+	let showTradesModal = $state(false);
+	let selectedTrades = $state<any[]>([]);
+	let loadingTrades = $state(false);
 
 	onMount(async () => {
 		// Set default dates - yesterday only (1 day range for fast testing)
@@ -109,6 +114,20 @@
 			await loadBacktests();
 		} catch (e) {
 			console.error('Failed to stop backtest:', e);
+		}
+	}
+
+	async function viewTrades(backtest: Backtest) {
+		showTradesModal = true;
+		loadingTrades = true;
+		try {
+			const response = await api.backtest.getTrades(botId, backtest.id);
+			selectedTrades = response.trades || [];
+		} catch (e) {
+			console.error('Failed to load trades:', e);
+			selectedTrades = [];
+		} finally {
+			loadingTrades = false;
 		}
 	}
 
@@ -223,6 +242,7 @@
 										<span class="result-label">Max Drawdown</span>
 										<span class="result-value negative">{backtest.result.max_drawdown.toFixed(2)}%</span>
 									</div>
+									<button onclick={() => viewTrades(backtest)} class="btn btn-secondary btn-sm">View Trades</button>
 								</div>
 							{/if}
 							{#if backtest.status === 'running'}
@@ -249,6 +269,51 @@
 				<BacktestChart results={selectedBacktest.result} />
 			</section>
 		{/if}
+
+		{#if showTradesModal}
+			<div class="modal-overlay" onclick={() => showTradesModal = false}>
+				<div class="modal-content trades-modal" onclick={(e) => e.stopPropagation()}>
+					<div class="modal-header">
+						<h3>Trade History</h3>
+						<button class="close-btn" onclick={() => showTradesModal = false}>×</button>
+					</div>
+					{#if loadingTrades}
+						<p class="loading">Loading trades...</p>
+					{:else if selectedTrades.length === 0}
+						<p class="empty-state">No trades recorded.</p>
+					{:else}
+						<div class="trades-table-wrapper">
+							<table class="trades-table">
+								<thead>
+									<tr>
+										<th>Type</th>
+										<th>Price</th>
+										<th>Amount</th>
+										<th>Exit Reason</th>
+										<th>Time</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each selectedTrades as trade}
+										<tr>
+											<td>
+												<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
+													{trade.type.toUpperCase()}
+												</span>
+											</td>
+											<td>${trade.price?.toFixed(6)}</td>
+											<td>${trade.amount?.toFixed(2)}</td>
+											<td>{trade.exit_reason || '-'}</td>
+											<td>{new Date(trade.timestamp * 1000).toLocaleString()}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</div>
+		</div>
+	{/if}
 	</div>
 </main>
 
@@ -323,6 +388,79 @@
 	.btn-refresh:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.btn-sm {
+		padding: 0.4rem 0.75rem;
+		font-size: 0.85rem;
+	}
+
+	/* Trades Modal */
+	.trades-modal {
+		max-width: 800px;
+		max-height: 80vh;
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.trades-modal .modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.trades-modal h3 {
+		margin: 0;
+		color: #667eea;
+	}
+
+	.trades-table-wrapper {
+		overflow-y: auto;
+		flex: 1;
+	}
+
+	.trades-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: 0.9rem;
+	}
+
+	.trades-table th,
+	.trades-table td {
+		padding: 0.75rem;
+		text-align: left;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.trades-table th {
+		background: rgba(255, 255, 255, 0.05);
+		font-weight: 600;
+		color: #ccc;
+		position: sticky;
+		top: 0;
+	}
+
+	.trades-table td {
+		color: #fff;
+	}
+
+	.trade-type {
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-weight: 600;
+		font-size: 0.8rem;
+	}
+
+	.trade-type.buy {
+		background: rgba(76, 175, 80, 0.2);
+		color: #4caf50;
+	}
+
+	.trade-type.sell {
+		background: rgba(244, 67, 54, 0.2);
+		color: #f44336;
 	}
 
 	.content {
