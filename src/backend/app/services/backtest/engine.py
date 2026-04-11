@@ -108,6 +108,34 @@ class BacktestEngine:
 
         return self.results
 
+    async def run_with_klines(self, klines: List[Dict[str, Any]]):
+        """Test helper method that runs backtest with provided klines (bypasses API call)."""
+        self.running = True
+        self.status = "running"
+        started_at = datetime.utcnow()
+
+        try:
+            if not klines:
+                self.status = "failed"
+                self.results = {"error": "No kline data available"}
+                return self.results
+
+            await self._process_klines(klines)
+            self._calculate_metrics()
+            self.status = "completed"
+
+        except Exception as e:
+            self.status = "failed"
+            self.results = {"error": str(e)}
+
+        ended_at = datetime.utcnow()
+        self.results = self.results or {}
+        self.results["started_at"] = started_at
+        self.results["ended_at"] = ended_at
+        self.results["duration_seconds"] = (ended_at - started_at).total_seconds()
+
+        return self.results
+
     async def _process_klines(self, klines: List[Dict[str, Any]]):
         self.total_klines = len(klines)
         for i, kline in enumerate(klines):
@@ -354,11 +382,11 @@ class BacktestEngine:
         for trade in self.trades:
             if trade["type"] == "buy":
                 running_position = trade["quantity"]
-                running_balance = trade["amount"]
+                running_balance -= trade["amount"]  # Subtract amount spent
                 current_token = trade["token"]
                 last_price = trade["price"]
-            else:
-                running_balance = trade["amount"]
+            else:  # sell
+                running_balance += trade["amount"]  # Add amount received
                 running_position = 0
                 last_price = trade["price"]
 
