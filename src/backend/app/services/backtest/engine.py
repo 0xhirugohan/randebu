@@ -18,14 +18,11 @@ class BacktestEngine:
         )
         self.bot_id = config.get("bot_id")
         self.strategy_config = config.get("strategy_config", {})
-        print(f"[DEBUG] strategy_config received: {self.strategy_config}")
         self.conditions = self.strategy_config.get("conditions", [])
         self.actions = self.strategy_config.get("actions", [])
         self.risk_management = self.strategy_config.get("risk_management", {})
-        print(f"[DEBUG] risk_management: {self.risk_management}")
         self.stop_loss_percent = self.risk_management.get("stop_loss_percent")
         self.take_profit_percent = self.risk_management.get("take_profit_percent")
-        print(f"[DEBUG] stop_loss_percent: {self.stop_loss_percent}, take_profit_percent: {self.take_profit_percent}")
         self.initial_balance = config.get("initial_balance", 10000.0)
         self.current_balance = self.initial_balance
         self.position = 0.0
@@ -36,6 +33,7 @@ class BacktestEngine:
         self.running = False
         self.progress = 0
         self.total_klines = 0
+        self.last_kline_price: Optional[float] = None  # Track last price for open position valuation
 
     async def run(self) -> Dict[str, Any]:
         self.running = True
@@ -121,6 +119,8 @@ class BacktestEngine:
             price = float(kline.get("close", 0))
             if price <= 0:
                 continue
+            
+            self.last_kline_price = price  # Track last price for open position valuation
 
             timestamp = kline.get("timestamp", 0)
 
@@ -316,10 +316,16 @@ class BacktestEngine:
                 )
 
     def _calculate_metrics(self):
+        # For open positions, use the last kline price to mark to market
+        # If no last kline price, fall back to entry price
+        position_price = self.last_kline_price
+        if position_price is None and self.trades and self.position > 0:
+            position_price = self.trades[-1]["price"]  # Fall back to entry price
+        
         final_balance = self.current_balance + (
-            self.position * self.trades[-1]["price"]
-            if self.trades and self.position > 0
-            else 0
+            self.position * position_price
+            if self.position > 0 and position_price
+            else self.current_balance
         )
         total_return = (
             (final_balance - self.initial_balance) / self.initial_balance
@@ -358,6 +364,11 @@ class BacktestEngine:
 
             portfolio_value = running_balance + (running_position * last_price)
             portfolio_values.append(portfolio_value)
+        
+        # If there's an open position, add final marked-to-market value
+        if self.position > 0 and self.last_kline_price:
+            final_portfolio_value = self.current_balance + (self.position * self.last_kline_price)
+            portfolio_values.append(final_portfolio_value)
 
         max_value = self.initial_balance
         max_drawdown = 0.0
