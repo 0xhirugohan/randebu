@@ -378,6 +378,80 @@ def test_dca_multiple_buys():
     return True
 
 
+def test_stop_loss_always_results_in_loss():
+    """Test that stop loss ALWAYS results in a loss, never a gain.
+    
+    This tests the scenario where:
+    - You start with $10,000
+    - Price keeps dropping, triggering multiple buys
+    - Stop loss triggers, selling your entire position
+    - Final balance MUST be less than initial balance
+    """
+    print("\n" + "=" * 60)
+    print("TEST 8: Stop Loss Always Results In Loss")
+    print("=" * 60)
+    
+    config = {
+        "bot_id": "test",
+        "strategy_config": {
+            "conditions": [{"type": "price_drop", "threshold": 2, "token": "TEST", "token_address": "0x123"}],
+            "actions": [{"type": "buy", "amount_percent": 20}],
+            "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 5},
+        },
+        "initial_balance": 10000.0,
+        "ave_api_key": "test",
+        "ave_api_plan": "free",
+    }
+    
+    # Price scenario: drops each kline, triggering multiple buys
+    # Final drop triggers stop loss
+    # 
+    # $0.60 -> $0.588 (2% drop) -> BUY 1 @ $0.588
+    # $0.588 -> $0.576 (2% drop) -> BUY 2 @ $0.576  
+    # $0.576 -> $0.565 (2% drop) -> BUY 3 @ $0.565
+    # $0.565 -> $0.535 (5.3% drop) -> STOP LOSS @ $0.535 (5% from weighted avg ~$0.576)
+    klines = [
+        {"close": "0.60", "timestamp": 1000},
+        {"close": "0.588", "timestamp": 2000},  # BUY 1
+        {"close": "0.576", "timestamp": 3000},  # BUY 2
+        {"close": "0.565", "timestamp": 4000},  # BUY 3
+        {"close": "0.535", "timestamp": 5000},  # STOP LOSS
+    ]
+    
+    test = TestBacktestEngine()
+    engine, result = test._run_backtest(config, klines)
+    
+    print(f"\nSetup:")
+    print(f"  Initial balance: $10,000")
+    print(f"  Stop loss: 5%")
+    print(f"  Each buy: 20% of current balance")
+    print(f"\nTrades:")
+    for i, trade in enumerate(engine.trades):
+        exit_info = f" ({trade.get('exit_reason', '')})" if 'exit_reason' in trade else ""
+        print(f"  {i+1}. {trade['type']} @ ${trade['price']} - ${trade['amount']:.2f}{exit_info}")
+    
+    print(f"\nResults:")
+    print(f"  Final balance: ${engine.current_balance:.2f}")
+    print(f"  Total return: {result['total_return']:.2f}%")
+    print(f"  Max drawdown: {result['max_drawdown']:.2f}%")
+    
+    # CRITICAL ASSERTION: Stop loss MUST result in loss
+    assert engine.current_balance < 10000.0, \
+        f"BUG: Stop loss resulted in GAIN! Balance went from $10,000 to ${engine.current_balance:.2f}"
+    
+    # Also verify total return is negative
+    assert result['total_return'] < 0, \
+        f"BUG: Total return is positive ({result['total_return']:.2f}%) after stop loss!"
+    
+    # Max drawdown should reflect the actual loss (close to stop loss %)
+    assert result['max_drawdown'] < 10, \
+        f"Max drawdown ({result['max_drawdown']:.2f}%) seems too high"
+    
+    print(f"\n✓ PASSED: Stop loss correctly resulted in ${10000 - engine.current_balance:.2f} loss")
+    return True
+
+
 if __name__ == "__main__":
     run_tests()
     test_dca_multiple_buys()
+    test_stop_loss_always_results_in_loss()
