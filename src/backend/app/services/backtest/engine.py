@@ -28,6 +28,7 @@ class BacktestEngine:
         self.position = 0.0
         self.position_token = ""
         self.entry_price: Optional[float] = None
+        self.cost_basis = 0.0  # Track total amount spent on current position for average price calc
         self.entry_time: Optional[int] = None
         self.trades: List[Dict[str, Any]] = []
         self.running = False
@@ -163,19 +164,26 @@ class BacktestEngine:
                     await self._execute_actions(price, timestamp, condition)
                     break
 
+    @property
+    def average_entry_price(self) -> Optional[float]:
+        """Calculate weighted average entry price based on cost basis."""
+        if self.position <= 0 or self.cost_basis <= 0:
+            return None
+        return self.cost_basis / self.position
+
     def _check_risk_management(
         self, current_price: float, timestamp: int
     ) -> Optional[Dict[str, Any]]:
-        if self.position <= 0 or self.entry_price is None:
+        if self.position <= 0 or self.average_entry_price is None:
             return None
 
         if self.stop_loss_percent is not None:
-            stop_loss_price = self.entry_price * (1 - self.stop_loss_percent / 100)
+            stop_loss_price = self.average_entry_price * (1 - self.stop_loss_percent / 100)
             if current_price <= stop_loss_price:
                 return {"reason": "stop_loss", "price": stop_loss_price}
 
         if self.take_profit_percent is not None:
-            take_profit_price = self.entry_price * (1 + self.take_profit_percent / 100)
+            take_profit_price = self.average_entry_price * (1 + self.take_profit_percent / 100)
             # Use small epsilon to handle floating point precision
             if current_price >= take_profit_price - 0.001:
                 return {"reason": "take_profit", "price": take_profit_price}
@@ -218,6 +226,7 @@ class BacktestEngine:
         )
         self.position = 0
         self.entry_price = None
+        self.cost_basis = 0.0
         self.entry_time = None
 
     def _check_condition(
@@ -282,10 +291,12 @@ class BacktestEngine:
             amount = self.current_balance * (amount_percent / 100)
 
             if action_type == "buy" and self.current_balance >= amount:
-                self.position += amount / price
+                quantity = amount / price
+                self.position += quantity
                 self.current_balance -= amount
+                self.cost_basis += amount  # Track total cost for average price
                 self.position_token = token
-                self.entry_price = price
+                self.entry_price = price  # Keep last entry price for reference
                 self.entry_time = timestamp
                 self.trades.append(
                     {
@@ -293,7 +304,7 @@ class BacktestEngine:
                         "token": token,
                         "price": price,
                         "amount": amount,
-                        "quantity": amount / price,
+                        "quantity": quantity,
                         "timestamp": timestamp,
                     }
                 )
@@ -382,13 +393,13 @@ class BacktestEngine:
 
         for trade in self.trades:
             if trade["type"] == "buy":
-                running_position = trade["quantity"]
+                running_position += trade["quantity"]  # Add to existing position (DCA)
                 running_balance -= trade["amount"]  # Subtract amount spent
                 current_token = trade["token"]
                 last_price = trade["price"]
             else:  # sell
                 running_balance += trade["amount"]  # Add amount received
-                running_position = 0
+                running_position = 0  # Close entire position
                 last_price = trade["price"]
 
             portfolio_value = running_balance + (running_position * last_price)

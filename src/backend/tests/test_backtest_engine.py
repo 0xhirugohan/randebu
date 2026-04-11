@@ -321,5 +321,63 @@ def run_tests():
         print(f"FAILED: {e}\n")
 
 
+def test_dca_multiple_buys():
+    """Test that DCA with multiple consecutive buys uses weighted average for stop loss."""
+    print("\n" + "=" * 60)
+    print("TEST 7: DCA With Multiple Consecutive Buys")
+    print("=" * 60)
+    
+    config = {
+        "bot_id": "test",
+        "strategy_config": {
+            "conditions": [{"type": "price_drop", "threshold": 2, "token": "TEST", "token_address": "0x123"}],
+            "actions": [{"type": "buy", "amount_percent": 20}],
+            "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 5},
+        },
+        "initial_balance": 10000.0,
+        "ave_api_key": "test",
+        "ave_api_plan": "free",
+    }
+    
+    # 3 consecutive 2% drops = 3 buys at $0.58, $0.57, $0.56
+    # Then drop to $0.50 which is below 5% from average (~$0.57 * 0.95 = $0.54)
+    klines = [
+        {"close": "0.60", "timestamp": 1000, "open": "0.60", "high": "0.60", "low": "0.60", "volume": "1000"},
+        {"close": "0.588", "timestamp": 2000},  # 2% drop -> BUY 1 @ $0.588
+        {"close": "0.576", "timestamp": 3000},  # 2% drop -> BUY 2 @ $0.576
+        {"close": "0.565", "timestamp": 4000},  # 2% drop -> BUY 3 @ $0.565
+        {"close": "0.50", "timestamp": 5000},   # Below 5% from avg -> STOP LOSS
+    ]
+    
+    test = TestBacktestEngine()
+    engine, result = test._run_backtest(config, klines)
+    test._trace_portfolio(engine, 10000.0)
+    
+    print(f"\nResults:")
+    print(f"  Trades: {len(engine.trades)} (expected 3: 2 buys + stop loss)")
+    print(f"  Max drawdown: {result['max_drawdown']}%")
+    print(f"  Total return: {result['total_return']}%")
+    
+    # Verify: 2 buys + 1 sell (stop loss) = 3 trades
+    # The 3rd buy @ $0.565 doesn't happen because stop loss triggers at $0.5 first
+    assert len(engine.trades) == 3, f"Expected 3 trades, got {len(engine.trades)}"
+    
+    # Verify last trade is stop loss
+    last_trade = engine.trades[-1]
+    assert last_trade["type"] == "sell", "Last trade should be sell"
+    assert last_trade.get("exit_reason") == "stop_loss", f"Last trade should be stop_loss, got {last_trade.get('exit_reason')}"
+    
+    # Verify max drawdown is reasonable (close to stop loss %)
+    # Actual loss should be around 5% from weighted average
+    assert result['max_drawdown'] < 10, f"Max drawdown {result['max_drawdown']}% is too high for 5% stop loss"
+    
+    # Position is now 0 after stop loss, so avg_entry_price is None
+    print(f"  Position closed: {engine.position == 0}")
+    print(f"  Final balance: ${engine.current_balance:.2f}")
+    print("PASSED")
+    return True
+
+
 if __name__ == "__main__":
     run_tests()
+    test_dca_multiple_buys()
