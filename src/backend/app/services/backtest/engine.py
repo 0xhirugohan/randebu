@@ -176,7 +176,8 @@ class BacktestEngine:
 
         if self.take_profit_percent is not None:
             take_profit_price = self.entry_price * (1 + self.take_profit_percent / 100)
-            if current_price >= take_profit_price:
+            # Use small epsilon to handle floating point precision
+            if current_price >= take_profit_price - 0.001:
                 return {"reason": "take_profit", "price": take_profit_price}
 
         return None
