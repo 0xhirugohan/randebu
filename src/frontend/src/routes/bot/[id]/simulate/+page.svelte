@@ -7,7 +7,8 @@
 	import { SignalChart, ProUpgradeBanner } from '$lib/components';
 
 	let botId = $derived($page.params.id);
-	let token = $state('PEPE');
+	let tokenName = $state('');
+	let tokenAddress = $state('');
 	let intervalSeconds = $state(60);
 	let autoExecute = $state(false);
 	let isRunning = $state(false);
@@ -27,6 +28,15 @@
 		try {
 			const bot = await api.bots.get(botId);
 			setCurrentBot(bot);
+			
+			// Extract token info from strategy config
+			const strategy = bot.strategy_config;
+			if (strategy) {
+				const condition = strategy.conditions?.[0];
+				const action = strategy.actions?.[0];
+				tokenName = condition?.token || action?.token || '';
+				tokenAddress = condition?.token_address || action?.token_address || '';
+			}
 		} catch (e) {
 			goto('/dashboard');
 		}
@@ -57,7 +67,7 @@
 
 		try {
 			const simulation = await api.simulate.start(botId, {
-				token,
+				token: tokenAddress,
 				interval_seconds: intervalSeconds,
 				auto_execute: autoExecute
 			});
@@ -111,9 +121,14 @@
 
 			<form onsubmit={(e) => { e.preventDefault(); startSimulation(); }}>
 				<div class="form-row">
-					<div class="field">
-						<label for="token">Token</label>
-						<input type="text" id="token" bind:value={token} required disabled={isRunning} />
+					<div class="field token-info">
+						<label>Token</label>
+						<div class="token-display">
+							<span class="token-name">{tokenName || 'Not configured'}</span>
+							{#if tokenAddress}
+								<span class="token-address">{tokenAddress.slice(0, 10)}...{tokenAddress.slice(-8)}</span>
+							{/if}
+						</div>
 					</div>
 					<div class="field">
 						<label for="interval">Check Interval (seconds)</label>
@@ -274,6 +289,27 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.5rem;
+	}
+
+	.token-display {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		padding: 0.75rem;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+	}
+
+	.token-name {
+		font-weight: 600;
+		color: #667eea;
+	}
+
+	.token-address {
+		font-size: 0.8rem;
+		color: #888;
+		font-family: 'Monaco', 'Menlo', monospace;
 	}
 
 	.checkbox-field {
