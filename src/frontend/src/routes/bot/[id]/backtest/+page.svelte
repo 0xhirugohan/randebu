@@ -280,44 +280,14 @@
 						<h3>Trade History</h3>
 						<button class="close-btn" onclick={() => showTradesModal = false}>×</button>
 					</div>
-					<div class="debug-info">selectedTrades.length = {selectedTrades.length}, loadingTrades = {loadingTrades}</div>
 					{#if loadingTrades}
-						<p class="loading">Loading trades...</p>
-					{:else if selectedTrades.length === 0}
-						<p class="empty-state">No trades recorded.</p>
+						<p>Loading trades...</p>
 					{:else}
-						<div class="trades-table-wrapper">
-							<table class="trades-table">
-								<thead>
-									<tr>
-										<th>Type</th>
-										<th>Price</th>
-										<th>Amount</th>
-										<th>Exit Reason</th>
-										<th>Time</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#each selectedTrades as trade}
-										<tr>
-											<td>
-												<span class="trade-type" class:buy={trade.type === 'buy'} class:sell={trade.type === 'sell'}>
-													{trade.type.toUpperCase()}
-												</span>
-											</td>
-											<td>${trade.price?.toFixed(6)}</td>
-											<td>${trade.amount?.toFixed(2)}</td>
-											<td>{trade.exit_reason || '-'}</td>
-											<td>{new Date(trade.timestamp * 1000).toLocaleString()}</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				{/if}
+						<pre>Debug: {JSON.stringify(selectedTrades)}</pre>
+					{/if}
+				</div>
 			</div>
-		</div>
-	{/if}
+		{/if}
 	</div>
 </main>
 
