@@ -350,11 +350,11 @@ class BacktestEngine:
         if position_price is None and self.trades and self.position > 0:
             position_price = self.trades[-1]["price"]  # Fall back to entry price
         
-        final_balance = self.current_balance + (
-            self.position * position_price
-            if self.position > 0 and position_price
-            else self.current_balance
-        )
+        # Calculate final balance: use marked-to-market value if position open, otherwise current balance
+        if self.position > 0 and position_price:
+            final_balance = self.current_balance + self.position * position_price
+        else:
+            final_balance = self.current_balance
         total_return = (
             (final_balance - self.initial_balance) / self.initial_balance
         ) * 100

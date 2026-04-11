@@ -1,189 +1,325 @@
 """
-Unit tests for BacktestEngine to verify stop loss functionality
+Unit tests for BacktestEngine
+Tests stop loss, take profit, and max drawdown calculations
 """
-import pytest
 import asyncio
 from app.services.backtest.engine import BacktestEngine
 
 
-class TestStopLoss:
-    """Test stop loss functionality"""
+class TestBacktestEngine:
+    """Test suite for BacktestEngine"""
     
-    def test_stop_loss_triggers_when_price_drops(self):
-        """Test that stop loss triggers when price drops to stop_loss_percent"""
+    def _run_backtest(self, config, klines):
+        """Helper to run backtest with given klines"""
+        engine = BacktestEngine(config)
+        result = asyncio.run(engine.run_with_klines(klines))
+        return engine, result
+    
+    def _trace_portfolio(self, engine, initial_balance):
+        """Print portfolio trace for debugging"""
+        running_balance = initial_balance
+        running_position = 0.0
+        
+        print("\nPortfolio Trace:")
+        for i, trade in enumerate(engine.trades):
+            if trade["type"] == "buy":
+                running_position = trade["quantity"]
+                running_balance -= trade["amount"]
+                portfolio = running_balance + (running_position * trade["price"])
+                print(f"  BUY  #{i+1}: @${trade['price']} - portfolio=${portfolio:.2f}")
+            else:
+                running_balance += trade["amount"]
+                running_position = 0
+                portfolio = running_balance
+                print(f"  SELL #{i+1}: @${trade['price']} ({trade.get('exit_reason', '')}) - portfolio=${portfolio:.2f}")
+        
+        if engine.position > 0 and engine.last_kline_price:
+            final = running_balance + (engine.position * engine.last_kline_price)
+            print(f"  FINAL: position={engine.position:.2f} @ ${engine.last_kline_price} = ${final:.2f}")
+        print()
+    
+    def test_stop_loss_triggers_correctly(self):
+        """Test stop loss triggers at configured percentage"""
         config = {
-            "bot_id": "test-bot",
+            "bot_id": "test",
             "strategy_config": {
-                "conditions": [
-                    {"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 10}
-                ],
-                "actions": [
-                    {"type": "buy", "amount_percent": 100}
-                ],
-                "risk_management": {
-                    "stop_loss_percent": 5,  # 5% stop loss
-                    "take_profit_percent": 10
-                }
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 5}],
+                "actions": [{"type": "buy", "amount_percent": 100}],
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
             },
             "ave_api_key": "test",
             "ave_api_plan": "free",
             "initial_balance": 10000.0,
         }
         
-        engine = BacktestEngine(config)
-        
-        # Simulate klines: buy at $100, then price drops to $94 (6% drop - should trigger 5% stop loss)
-        # Stop loss price = $100 * (1 - 0.05) = $95
-        # Price at $94 is below stop loss, so it should trigger
-        
+        # Price sequence that triggers buy then stop loss:
+        # $110 -> $100 (9% drop, BUY)
+        # $100 -> $95 (5% drop, STOP LOSS at 5% from $100 = $95)
         klines = [
-            {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
-            {"close": "99.0", "timestamp": 2000, "open": "99.0", "high": "99.0", "low": "99.0", "volume": "1000"},
-            {"close": "98.0", "timestamp": 3000, "open": "98.0", "high": "98.0", "low": "98.0", "volume": "1000"},
-            {"close": "97.0", "timestamp": 4000, "open": "97.0", "high": "97.0", "low": "97.0", "volume": "1000"},
-            {"close": "96.0", "timestamp": 5000, "open": "96.0", "high": "96.0", "low": "96.0", "volume": "1000"},
-            # Stop loss should trigger here at $95 or below
-            {"close": "94.0", "timestamp": 6000, "open": "94.0", "high": "94.0", "low": "94.0", "volume": "1000"},
+            {"close": "110.0", "timestamp": 1000, "open": "110.0", "high": "110.0", "low": "110.0", "volume": "1000"},
+            {"close": "100.0", "timestamp": 2000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
+            {"close": "95.0", "timestamp": 3000, "open": "95.0", "high": "95.0", "low": "95.0", "volume": "1000"},
         ]
         
-        result = asyncio.run(engine.run_with_klines(klines))
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
         
-        print(f"Trades: {engine.trades}")
-        print(f"Position after: {engine.position}")
-        print(f"Results: {result}")
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)} (expected 2)")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
         
-        # Should have executed a sell due to stop loss
-        sell_trades = [t for t in engine.trades if t["type"] == "sell"]
-        assert len(sell_trades) > 0, "Should have executed a sell due to stop loss"
-        assert sell_trades[0]["exit_reason"] == "stop_loss", f"Exit reason should be stop_loss, got {sell_trades[0].get('exit_reason')}"
+        assert len(engine.trades) == 2
+        assert engine.trades[0]["type"] == "buy"
+        assert engine.trades[1]["type"] == "sell"
+        assert engine.trades[1]["exit_reason"] == "stop_loss"
+        # Max drawdown should be ~5% (stop loss percentage)
+        assert 3 < result['max_drawdown'] < 8
+        # Total return should be ~-5%
+        assert -8 < result['total_return'] < -3
     
-    def test_max_drawdown_with_multiple_buys(self):
-        """Test max drawdown when there are more buys than sells"""
+    def test_take_profit_triggers(self):
+        """Test take profit triggers at configured percentage"""
         config = {
-            "bot_id": "test-bot",
+            "bot_id": "test",
             "strategy_config": {
-                "conditions": [
-                    {"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 10}
-                ],
-                "actions": [
-                    {"type": "buy", "amount_percent": 50}
-                ],
-                "risk_management": {
-                    "stop_loss_percent": 5,
-                    "take_profit_percent": 5
-                }
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 5}],
+                "actions": [{"type": "buy", "amount_percent": 100}],
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
             },
             "ave_api_key": "test",
             "ave_api_plan": "free",
             "initial_balance": 10000.0,
         }
         
-        engine = BacktestEngine(config)
-        
-        # Simulate:
-        # 1. Buy at $100 (condition triggered at start)
-        # 2. Price rises to $105 -> take profit sells
-        # 3. Buy again at $105
-        # 4. Price drops to $94 -> stop loss triggers at $99.75
-        # 5. Buy at $94 (new position)
-        # 6. Price continues to drop - no more sells
-        
+        # $100 -> $95 (5% drop, BUY) -> $104.5 (10% rise, TAKE PROFIT)
         klines = [
-            # First buy at $100
             {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
-            # Price rises, take profit at $105
-            {"close": "105.0", "timestamp": 2000, "open": "105.0", "high": "105.0", "low": "105.0", "volume": "1000"},
-            # Second buy at $105 (price dropped 10% from peak triggers buy)
-            {"close": "105.0", "timestamp": 3000, "open": "105.0", "high": "105.0", "low": "105.0", "volume": "1000"},
-            # Price drops, stop loss should trigger at $99.75 (5% from $105)
-            {"close": "99.0", "timestamp": 4000, "open": "99.0", "high": "99.0", "low": "99.0", "volume": "1000"},
-            # Third buy at $99 (after stop loss, price dropped 10% from $110)
-            {"close": "99.0", "timestamp": 5000, "open": "99.0", "high": "99.0", "low": "99.0", "volume": "1000"},
-            # Price continues to drop to $80 (no sell triggered since position is closed)
-            {"close": "80.0", "timestamp": 6000, "open": "80.0", "high": "80.0", "low": "80.0", "volume": "1000"},
+            {"close": "95.0", "timestamp": 2000, "open": "95.0", "high": "95.0", "low": "95.0", "volume": "1000"},
+            {"close": "104.5", "timestamp": 3000, "open": "104.5", "high": "104.5", "low": "104.5", "volume": "1000"},
         ]
         
-        result = asyncio.run(engine.run_with_klines(klines))
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
         
-        print(f"\n=== Max Drawdown Test ===")
-        print(f"Trades: {engine.trades}")
-        print(f"Number of sells: {len([t for t in engine.trades if t['type'] == 'sell'])}")
-        print(f"Max drawdown: {result.get('max_drawdown')}")
-        print(f"Stop loss percent configured: {engine.stop_loss_percent}")
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)} (expected 2)")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
         
-        # With 5% stop loss, max drawdown should be around 5% (plus some slippage)
-        # NOT 82%!
-        if result.get('max_drawdown', 0) > 10:
-            print(f"ERROR: Max drawdown {result.get('max_drawdown')}% is too high with 5% stop loss!")
+        assert len(engine.trades) == 2
+        assert engine.trades[1]["exit_reason"] == "take_profit"
+        assert result['total_return'] > 0
     
-    def test_multiple_buys_sells_sequence(self):
-        """Test with a sequence: buy, sell, buy, sell, buy (open position)"""
+    def test_max_drawdown_bounded_by_stop_loss(self):
+        """Test that max drawdown is bounded by stop loss when position is properly closed"""
         config = {
-            "bot_id": "test-bot",
+            "bot_id": "test",
             "strategy_config": {
-                "conditions": [
-                    {"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 10}
-                ],
-                "actions": [
-                    {"type": "buy", "amount_percent": 50}
-                ],
-                "risk_management": {
-                    "stop_loss_percent": 5,
-                    "take_profit_percent": 10
-                }
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 5}],
+                "actions": [{"type": "buy", "amount_percent": 100}],
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
             },
             "ave_api_key": "test",
             "ave_api_plan": "free",
             "initial_balance": 10000.0,
         }
         
-        engine = BacktestEngine(config)
-        
-        # Sequence:
-        # 1. K1: $100 -> Buy (condition triggers because price_drop threshold met at start)
-        # 2. K2: $110 -> Take profit sells (10% gain)
-        # 3. K3: $100 -> Buy (10% drop triggers)
-        # 4. K4: $90 -> Stop loss triggers (5% loss from $94.5 avg... wait no)
-        #    Stop loss from $100 with 5% = $95
-        #    $90 is below $95, so stop loss triggers
-        # 5. K5: $85 -> Buy ($85 is 15% drop from $100)
-        # 6. K6: $80 -> No sell (position open)
-        
+        # $110 -> $100 -> $95 (BUY) -> $90 (STOP LOSS)
         klines = [
-            # Initial buy at $100
-            {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
-            # Price goes up to $110 - take profit triggers (10% gain)
-            {"close": "110.0", "timestamp": 2000, "open": "110.0", "high": "110.0", "low": "110.0", "volume": "1000"},
-            # Price drops to $100 - buy triggers again
-            {"close": "100.0", "timestamp": 3000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
-            # Price drops to $94 - stop loss should trigger (5% from $100 = $95)
-            {"close": "94.0", "timestamp": 4000, "open": "94.0", "high": "94.0", "low": "94.0", "volume": "1000"},
-            # Price drops to $85 - buy triggers again (15% drop from $100)
-            {"close": "85.0", "timestamp": 5000, "open": "85.0", "high": "85.0", "low": "85.0", "volume": "1000"},
-            # Price drops to $80 - no sell, position still open
-            {"close": "80.0", "timestamp": 6000, "open": "80.0", "high": "80.0", "low": "80.0", "volume": "1000"},
+            {"close": "110.0", "timestamp": 1000, "open": "110.0", "high": "110.0", "low": "110.0", "volume": "1000"},
+            {"close": "100.0", "timestamp": 2000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
+            {"close": "95.0", "timestamp": 3000, "open": "95.0", "high": "95.0", "low": "95.0", "volume": "1000"},
+            {"close": "90.0", "timestamp": 4000, "open": "90.0", "high": "90.0", "low": "90.0", "volume": "1000"},
         ]
         
-        result = asyncio.run(engine.run_with_klines(klines))
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
         
-        print(f"\n=== Multiple Buys/Sells Test ===")
-        print(f"Trades: {engine.trades}")
-        print(f"Buy trades: {len([t for t in engine.trades if t['type'] == 'buy'])}")
-        print(f"Sell trades: {len([t for t in engine.trades if t['type'] == 'sell'])}")
-        print(f"Open position: {engine.position}")
-        print(f"Max drawdown: {result.get('max_drawdown')}")
-        print(f"Total return: {result.get('total_return')}")
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)}")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
         
-        # Should have 2 sell trades (take profit and stop loss)
-        sell_trades = [t for t in engine.trades if t["type"] == "sell"]
-        print(f"Sell exit reasons: {[t.get('exit_reason') for t in sell_trades]}")
+        # With 5% stop loss, max drawdown should be around 5%
+        assert 3 < result['max_drawdown'] < 8
+    
+    def test_open_position_not_closed(self):
+        """Test scenario where last kline has an open position"""
+        config = {
+            "bot_id": "test",
+            "strategy_config": {
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 10}],
+                "actions": [{"type": "buy", "amount_percent": 100}],
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
+            },
+            "ave_api_key": "test",
+            "ave_api_plan": "free",
+            "initial_balance": 10000.0,
+        }
+        
+        # $100 -> $90 (10% drop, BUY) - and backtest ends here
+        # Position is open, marked to market at $90
+        klines = [
+            {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
+            {"close": "90.0", "timestamp": 2000, "open": "90.0", "high": "90.0", "low": "90.0", "volume": "1000"},
+        ]
+        
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
+        
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)}")
+        print(f"  Position open: {engine.position > 0}")
+        print(f"  Entry price: ${engine.entry_price}")
+        print(f"  Last kline price: ${engine.last_kline_price}")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
+        
+        # Position should be open
+        assert engine.position > 0
+        # Entry should be $90
+        assert engine.entry_price == 90.0
+        # Since entry = last kline price, no unrealized loss
+        # Max drawdown should be 0%
+        assert result['max_drawdown'] == 0.0
+    
+    def test_open_position_with_loss(self):
+        """Test open position where price dropped but stop loss didn't trigger"""
+        config = {
+            "bot_id": "test",
+            "strategy_config": {
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 10}],
+                "actions": [{"type": "buy", "amount_percent": 100}],
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
+            },
+            "ave_api_key": "test",
+            "ave_api_plan": "free",
+            "initial_balance": 10000.0,
+        }
+        
+        # $100 -> $90 (10% drop, BUY at $90) -> $85 (stop loss at 5% from $90 = $85.5)
+        # $85 > $85.5? No, $85 < $85.5, so stop loss WOULD trigger
+        # Let me use $86 instead - $86 > $85.5 so no stop loss
+        klines = [
+            {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
+            {"close": "90.0", "timestamp": 2000, "open": "90.0", "high": "90.0", "low": "90.0", "volume": "1000"},
+            {"close": "86.0", "timestamp": 3000, "open": "86.0", "high": "86.0", "low": "86.0", "volume": "1000"},
+        ]
+        
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
+        
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)}")
+        print(f"  Position open: {engine.position > 0}")
+        print(f"  Entry price: ${engine.entry_price}")
+        print(f"  Last kline price: ${engine.last_kline_price}")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
+        
+        # Position should be open
+        assert engine.position > 0
+        # Entry = $90, stop = $85.50, last = $86 (above stop)
+        # Portfolio: $0 + position * $86
+        # Position: 10000/90 = 111.11 tokens
+        # Portfolio at $86: 111.11 * 86 = $9,555.56
+        # But we only track portfolio at trade points, so max was $10,000
+        # drawdown = (10000 - 9555.56) / 10000 = 4.44%
+        print(f"  Expected max drawdown: ~4.4% (marked to market at $86)")
+    
+    def test_multiple_buy_sell_cycles(self):
+        """Test multiple buy/sell cycles"""
+        config = {
+            "bot_id": "test",
+            "strategy_config": {
+                "conditions": [{"type": "price_drop", "token": "TEST", "token_address": "0x123", "threshold": 5}],
+                "actions": [{"type": "buy", "amount_percent": 50}],  # 50% of balance
+                "risk_management": {"stop_loss_percent": 5, "take_profit_percent": 10}
+            },
+            "ave_api_key": "test",
+            "ave_api_plan": "free",
+            "initial_balance": 10000.0,
+        }
+        
+        # $100 -> $95 (BUY) -> $104.5 (TAKE PROFIT) -> $95 (BUY) -> $90 (STOP LOSS)
+        klines = [
+            {"close": "100.0", "timestamp": 1000, "open": "100.0", "high": "100.0", "low": "100.0", "volume": "1000"},
+            {"close": "95.0", "timestamp": 2000, "open": "95.0", "high": "95.0", "low": "95.0", "volume": "1000"},   # BUY at $95
+            {"close": "104.5", "timestamp": 3000, "open": "104.5", "high": "104.5", "low": "104.5", "volume": "1000"},  # TAKE PROFIT
+            {"close": "95.0", "timestamp": 4000, "open": "95.0", "high": "95.0", "low": "95.0", "volume": "1000"},   # 9% drop - no buy
+            {"close": "90.0", "timestamp": 5000, "open": "90.0", "high": "90.0", "low": "90.0", "volume": "1000"},   # 10.5% drop from $100 - BUY at $90
+            {"close": "85.5", "timestamp": 6000, "open": "85.5", "high": "85.5", "low": "85.5", "volume": "1000"},   # STOP LOSS at 5% from $90 = $85.5
+        ]
+        
+        engine, result = self._run_backtest(config, klines)
+        self._trace_portfolio(engine, 10000.0)
+        
+        print(f"Results:")
+        print(f"  Trades: {len(engine.trades)}")
+        print(f"  Buy count: {len([t for t in engine.trades if t['type'] == 'buy'])}")
+        print(f"  Sell count: {len([t for t in engine.trades if t['type'] == 'sell'])}")
+        print(f"  Max drawdown: {result['max_drawdown']}%")
+        print(f"  Total return: {result['total_return']}%")
+
+
+def run_tests():
+    tests = TestBacktestEngine()
+    
+    print("=" * 60)
+    print("TEST 1: Stop Loss Triggers Correctly")
+    print("=" * 60)
+    try:
+        tests.test_stop_loss_triggers_correctly()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
+    
+    print("=" * 60)
+    print("TEST 2: Take Profit Triggers")
+    print("=" * 60)
+    try:
+        tests.test_take_profit_triggers()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
+    
+    print("=" * 60)
+    print("TEST 3: Max Drawdown Bounded by Stop Loss")
+    print("=" * 60)
+    try:
+        tests.test_max_drawdown_bounded_by_stop_loss()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
+    
+    print("=" * 60)
+    print("TEST 4: Open Position Not Closed")
+    print("=" * 60)
+    try:
+        tests.test_open_position_not_closed()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
+    
+    print("=" * 60)
+    print("TEST 5: Open Position With Loss")
+    print("=" * 60)
+    try:
+        tests.test_open_position_with_loss()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
+    
+    print("=" * 60)
+    print("TEST 6: Multiple Buy/Sell Cycles")
+    print("=" * 60)
+    try:
+        tests.test_multiple_buy_sell_cycles()
+        print("PASSED\n")
+    except AssertionError as e:
+        print(f"FAILED: {e}\n")
 
 
 if __name__ == "__main__":
-    test = TestStopLoss()
-    print("=== Test 1: Stop Loss Triggers ===")
-    test.test_stop_loss_triggers_when_price_drops()
-    print("\n=== Test 2: Max Drawdown with Multiple Buys ===")
-    test.test_max_drawdown_with_multiple_buys()
-    print("\n=== Test 3: Multiple Buys/Sells Sequence ===")
-    test.test_multiple_buys_sells_sequence()
+    run_tests()
