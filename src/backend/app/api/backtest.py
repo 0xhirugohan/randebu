@@ -213,7 +213,9 @@ def get_backtest_trades(
         "backtest_id": run_id,
         "trades": trades,
         "total_trades": len(trades),
-    }@router.get("/bots/{bot_id}/backtests", response_model=List[BacktestResponse])
+    }
+
+@router.get("/bots/{bot_id}/backtests", response_model=List[BacktestResponse])
 def list_backtests(
     bot_id: str,
     current_user: User = Depends(get_current_user),
