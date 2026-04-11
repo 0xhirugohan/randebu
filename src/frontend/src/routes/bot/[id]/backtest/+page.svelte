@@ -118,11 +118,14 @@
 	}
 
 	async function viewTrades(backtest: Backtest) {
+		console.log('viewTrades called', backtest.id);
 		showTradesModal = true;
 		loadingTrades = true;
 		try {
 			const response = await api.backtest.getTrades(botId, backtest.id);
+			console.log('Trades response:', response);
 			selectedTrades = response.trades || [];
+			console.log('selectedTrades set to:', selectedTrades.length, 'trades');
 		} catch (e) {
 			console.error('Failed to load trades:', e);
 			selectedTrades = [];
