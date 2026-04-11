@@ -99,8 +99,9 @@ class AveCloudClient:
             )
             response.raise_for_status()
             data = response.json()
-            if data.get("status") == 200:
-                return data.get("data", [])
+            # AVE API returns status: 1 for success, not 200
+            if data.get("status") == 1:
+                return data.get("data", {}).get("points", [])
             raise Exception(f"Failed to fetch klines: {data}")
 
     async def get_token_price(self, token_id: str) -> Optional[Dict[str, Any]]:
