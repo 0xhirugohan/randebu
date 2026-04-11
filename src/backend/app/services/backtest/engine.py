@@ -18,11 +18,14 @@ class BacktestEngine:
         )
         self.bot_id = config.get("bot_id")
         self.strategy_config = config.get("strategy_config", {})
+        print(f"[DEBUG] strategy_config received: {self.strategy_config}")
         self.conditions = self.strategy_config.get("conditions", [])
         self.actions = self.strategy_config.get("actions", [])
         self.risk_management = self.strategy_config.get("risk_management", {})
+        print(f"[DEBUG] risk_management: {self.risk_management}")
         self.stop_loss_percent = self.risk_management.get("stop_loss_percent")
         self.take_profit_percent = self.risk_management.get("take_profit_percent")
+        print(f"[DEBUG] stop_loss_percent: {self.stop_loss_percent}, take_profit_percent: {self.take_profit_percent}")
         self.initial_balance = config.get("initial_balance", 10000.0)
         self.current_balance = self.initial_balance
         self.position = 0.0
