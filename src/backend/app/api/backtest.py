@@ -235,6 +235,7 @@ def list_backtests(
         db.query(Backtest)
         .filter(Backtest.bot_id == bot_id)
         .order_by(Backtest.started_at.desc())
+        .limit(5)
         .all()
     )
     return backtests
