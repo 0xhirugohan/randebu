@@ -226,7 +226,7 @@ def stop_simulation(
 
     if run_id in running_simulations:
         engine = running_simulations[run_id]
-        asyncio.create_task(engine.stop())
+        engine.stop()
         simulation.status = "stopped"
         db.commit()
 

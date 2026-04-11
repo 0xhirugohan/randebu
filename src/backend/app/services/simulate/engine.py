@@ -258,7 +258,7 @@ class SimulateEngine:
 
             self.signals.append(signal)
 
-    async def stop(self):
+    def stop(self):
         self.running = False
         self.status = "stopped"
 
