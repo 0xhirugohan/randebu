@@ -115,7 +115,7 @@ class AveCloudClient:
             )
             response.raise_for_status()
             data = response.json()
-            if data.get("status") == 200:
+            if data.get("status") == 1:
                 prices = data.get("data", {})
                 return prices.get(token_id)
             return None
