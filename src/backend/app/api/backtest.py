@@ -66,7 +66,7 @@ def run_backtest_sync(
                         confidence=signal_data.get("confidence"),
                         reasoning=signal_data.get("reasoning"),
                         executed=signal_data.get("executed", False),
-                        created_at=signal_data["created_at"],
+                        created_at=signal["created_at"],  # Use original datetime, not converted string
                     )
                     db.add(db_signal)
                 db.commit()
