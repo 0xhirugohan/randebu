@@ -133,7 +133,7 @@
 						<label for="interval">Check Interval</label>
 						<select id="interval" bind:value={intervalSeconds} disabled={isRunning}>
 							<option value={10}>Every 10 seconds</option>
-							<<option value={30}>Every 30 seconds</option>
+							<option value={30}>Every 30 seconds</option>
 							<option value={60}>Every minute</option>
 						</select>
 					</div>
