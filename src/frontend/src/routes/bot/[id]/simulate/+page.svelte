@@ -11,6 +11,7 @@
 	let tokenAddress = $state('');
 	let klineInterval = $state('1m');
 	let isRunning = $state(false);
+	let isRefreshing = $state(false);
 
 	onMount(async () => {
 		if (!$isAuthenticated && !$isLoading) {
@@ -42,6 +43,7 @@
 	}
 
 	async function loadSimulations() {
+		isRefreshing = true;
 		try {
 			const simulations = await api.simulate.list(botId);
 			
@@ -58,6 +60,8 @@
 			}
 		} catch (e) {
 			console.error('Failed to load simulations:', e);
+		} finally {
+			isRefreshing = false;
 		}
 	}
 
@@ -104,6 +108,18 @@
 		<div class="header-left">
 			<a href="/bot/{botId}" class="back-link">← Back to Chat</a>
 			<h1>Simulation</h1>
+		</div>
+		<div class="header-right">
+			{#if $simulationStore.currentSimulation}
+				<button 
+					type="button" 
+					class="refresh-btn"
+					onclick={() => loadSimulations()}
+					class:refreshing={isRefreshing}
+				>
+					{isRefreshing ? '⟳ Refreshing...' : '⟳ Refresh'}
+				</button>
+			{/if}
 		</div>
 	</header>
 
@@ -222,6 +238,42 @@
 		max-width: 900px;
 		margin: 0 auto;
 		padding: 2rem;
+	}
+
+	header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 1rem;
+	}
+
+	.header-right {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.refresh-btn {
+		background: rgba(255, 255, 255, 0.1);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		color: #fff;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-size: 0.875rem;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		transition: all 0.2s;
+	}
+
+	.refresh-btn:hover {
+		background: rgba(255, 255, 255, 0.15);
+		border-color: rgba(255, 255, 255, 0.3);
+	}
+
+	.refresh-btn.refreshing {
+		opacity: 0.7;
+		cursor: not-allowed;
 	}
 
 	header {
