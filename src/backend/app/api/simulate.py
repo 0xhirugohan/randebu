@@ -141,15 +141,11 @@ async def start_simulation(
     settings = get_settings()
     simulation_id = str(uuid.uuid4())
 
-    check_interval = config.check_interval
-    if settings.AVE_API_PLAN != "pro" and check_interval < 60:
-        check_interval = 60
-
     simulation_config = {
         "bot_id": bot_id,
         "token": config.token,
         "chain": config.chain,
-        "check_interval": check_interval,
+        "check_interval": config.check_interval,
         "auto_execute": False,  # Always paper trade
         "strategy_config": bot.strategy_config,
         "ave_api_key": settings.AVE_API_KEY,
@@ -164,7 +160,7 @@ async def start_simulation(
         config={
             "token": config.token,
             "chain": config.chain,
-            "check_interval": check_interval,
+            "check_interval": config.check_interval,
         },
         signals=[],
     )
