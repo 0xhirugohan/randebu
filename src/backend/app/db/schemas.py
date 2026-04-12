@@ -119,6 +119,9 @@ class SimulationResponse(BaseModel):
     signals: Optional[List[dict]]
     klines: Optional[List[dict]] = None  # Price data for chart
     trade_log: Optional[List[dict]] = None  # Trade activity log
+    current_candle_index: Optional[int] = None  # Progress: current candle
+    total_candles: Optional[int] = None  # Progress: total candles
+    candles_processed: Optional[int] = None  # Progress: candles processed
 
     class Config:
         from_attributes = True

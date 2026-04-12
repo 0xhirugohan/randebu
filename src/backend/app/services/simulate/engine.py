@@ -30,7 +30,15 @@ class SimulateEngine:
         
         # Kline-based settings
         self.kline_interval = config.get("kline_interval", "1m")
-        self.max_candles = config.get("max_candles", 500)  # Limit candles to process
+        self.max_candles = config.get("max_candles", 100)  # Limit candles to simulate real-time
+        
+        # Delay between candles (in seconds) to simulate real-time
+        # e.g., 1m interval -> 30s delay between candles
+        # Use config value if provided, otherwise calculate
+        if "candle_delay" in config and config["candle_delay"] is not None:
+            self.candle_delay = config["candle_delay"]
+        else:
+            self.candle_delay = self._get_interval_seconds(self.kline_interval) / 2
         
         self.auto_execute = config.get("auto_execute", False)
         self.token = config.get("token", "")
@@ -61,7 +69,24 @@ class SimulateEngine:
         
         # Trade log - tracks what happened at each candle
         self.trade_log: List[Dict[str, Any]] = []
+        
+        # Current candle being processed (for frontend to show progress)
+        self.current_candle_index = 0
+        self.total_candles = 0
 
+    def _get_interval_seconds(self, interval: str) -> int:
+        """Convert kline interval to seconds."""
+        mapping = {
+            "1m": 60,
+            "5m": 300,
+            "15m": 900,
+            "30m": 1800,
+            "1h": 3600,
+            "4h": 14400,
+            "1d": 86400,
+        }
+        return mapping.get(interval, 60)
+    
     async def run(self) -> Dict[str, Any]:
         self.running = True
         self.status = "running"
@@ -91,13 +116,17 @@ class SimulateEngine:
             
             # Step 2: Process candles (with limit)
             candles_processed = 0
-            for candle in self.klines:
+            self.total_candles = min(len(self.klines), self.max_candles)
+            self.current_candle_index = 0
+            
+            for i, candle in enumerate(self.klines):
                 if not self.running:
                     break
                 if candles_processed >= self.max_candles:
                     logger.info(f"Reached max candles limit ({self.max_candles})")
                     break
                 
+                self.current_candle_index = candles_processed
                 candle_time = int(candle.get("time", 0))
                 
                 # Get OHLCV data from candle
@@ -116,6 +145,10 @@ class SimulateEngine:
                     self.last_processed_time = candle_time
                 
                 candles_processed += 1
+                
+                # Delay to simulate real-time (only for visible candles, not initial batch)
+                if candles_processed > 1 and self.candle_delay > 0:
+                    await asyncio.sleep(self.candle_delay)
             
             self.status = "completed"
 
@@ -131,7 +164,9 @@ class SimulateEngine:
         self.results["total_errors"] = len(self.errors)
         self.results["errors"] = self.errors
         self.results["signals"] = self.signals
-        self.results["candles_processed"] = candles_processed if self.running else 0
+        self.results["candles_processed"] = candles_processed
+        self.results["current_candle_index"] = self.current_candle_index
+        self.results["total_candles"] = self.total_candles
         self.results["klines"] = self.klines  # Include klines for chart display
         self.results["trade_log"] = self.trade_log  # Include trade log for dashboard
         self.results["started_at"] = self.started_at

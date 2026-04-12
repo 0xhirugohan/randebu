@@ -26,7 +26,8 @@ def create_engine(config_override=None, klines_data=None):
         "token": "0x1234567890123456789012345678901234567890",
         "chain": "bsc",
         "kline_interval": "1m",
-        "max_candles": 100,
+        "max_candles": 10,  # Small number for fast tests
+        "candle_delay": 0,  # No delay in tests
         "auto_execute": False,
         "strategy_config": {
             "conditions": [

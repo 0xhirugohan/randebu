@@ -35,20 +35,18 @@ def run_simulation_sync(
         engine.run_id = simulation_id
         running_simulations[simulation_id] = engine
         
-        try:
-            # Run simulation (now synchronous - processes klines quickly)
-            results = await engine.run()
-            
-            # Serialize signals for JSON storage (convert datetime to string)
-            def serialize_signal(s):
-                created = s.get("created_at")
-                if hasattr(created, "isoformat"):
-                    created = created.isoformat()
-                return {
-                    **s,
-                    "created_at": created
-                }
-            
+        # Serialize signals for JSON storage (convert datetime to string)
+        def serialize_signal(s):
+            created = s.get("created_at")
+            if hasattr(created, "isoformat"):
+                created = created.isoformat()
+            return {
+                **s,
+                "created_at": created
+            }
+        
+        def save_progress():
+            """Save current progress to database."""
             db = SessionLocal()
             try:
                 simulation = (
@@ -57,34 +55,38 @@ def run_simulation_sync(
                 if simulation:
                     simulation.status = engine.status
                     simulation.signals = [serialize_signal(s) for s in engine.signals]
-                    # Save klines for chart display (only time and close price)
                     simulation.klines = [
                         {"time": k.get("time"), "close": k.get("close")}
                         for k in engine.klines
                     ]
-                    # Save trade log for dashboard
                     simulation.trade_log = engine.trade_log
                     db.commit()
+            finally:
+                db.close()
+        
+        async def run_with_progress_save():
+            """Run simulation and save progress periodically."""
+            last_save_time = time.time()
+            save_interval = 5  # Save every 5 seconds
+            
+            while engine.running and engine.status == "running":
+                await asyncio.sleep(1)  # Check every second
+                
+                current_time = time.time()
+                if current_time - last_save_time >= save_interval:
+                    save_progress()
+                    last_save_time = current_time
+            
+            # Final save when done
+            save_progress()
+        
+        try:
+            # Run both simulation and progress saving concurrently
+            await asyncio.gather(
+                engine.run(),
+                run_with_progress_save()
+            )
 
-                for signal in engine.signals:
-                    created_at = signal.get("created_at")
-                    if hasattr(created_at, "isoformat"):
-                        created_at = created_at.isoformat()
-                    
-                    db_signal = Signal(
-                        id=signal["id"],
-                        bot_id=signal["bot_id"],
-                        run_id=signal["run_id"],
-                        signal_type=signal["signal_type"],
-                        token=signal["token"],
-                        price=signal["price"],
-                        confidence=signal.get("confidence"),
-                        reasoning=signal.get("reasoning"),
-                        executed=signal.get("executed", False),
-                        created_at=created_at,
-                    )
-                    db.add(db_signal)
-                db.commit()
             finally:
                 db.close()
         finally:

@@ -118,6 +118,9 @@ export interface Simulation {
 	signals: Signal[] | null;
 	klines?: { time: number; close: number }[];
 	trade_log?: TradeLogEntry[];
+	current_candle_index?: number;
+	total_candles?: number;
+	candles_processed?: number;
 }
 
 export interface SimulationConfig {
