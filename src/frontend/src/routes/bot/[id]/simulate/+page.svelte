@@ -160,7 +160,7 @@
 			{#if $simulationStore.signals.length === 0}
 				<p class="empty-state">No signals yet. Start a simulation to see trading signals.</p>
 			{:else}
-				<SignalChart signals={$simulationStore.signals} height={200} />
+				<SignalChart signals={$simulationStore.signals} klines={$simulationStore.currentSimulation?.klines || []} height={200} />
 				
 				<div class="signals-list">
 					{#each $simulationStore.signals as signal}

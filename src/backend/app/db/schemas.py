@@ -117,6 +117,7 @@ class SimulationResponse(BaseModel):
     status: str
     config: dict
     signals: Optional[List[dict]]
+    klines: Optional[List[dict]] = None  # Price data for chart
 
     class Config:
         from_attributes = True

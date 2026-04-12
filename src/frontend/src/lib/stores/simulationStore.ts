@@ -1,9 +1,15 @@
 import { writable } from 'svelte/store';
 import type { Simulation, Signal } from '$lib/api';
 
+export interface KlineData {
+	time: number;
+	close: number;
+}
+
 export interface SimulationState {
 	currentSimulation: Simulation | null;
 	signals: Signal[];
+	klines: KlineData[];
 	isLoading: boolean;
 	error: string | null;
 }
@@ -11,6 +17,7 @@ export interface SimulationState {
 const initialState: SimulationState = {
 	currentSimulation: null,
 	signals: [],
+	klines: [],
 	isLoading: false,
 	error: null
 };
@@ -18,7 +25,11 @@ const initialState: SimulationState = {
 export const simulationStore = writable<SimulationState>(initialState);
 
 export function setCurrentSimulation(simulation: Simulation | null) {
-	simulationStore.update(state => ({ ...state, currentSimulation: simulation }));
+	simulationStore.update(state => ({ 
+		...state, 
+		currentSimulation: simulation,
+		klines: simulation?.klines || []
+	}));
 }
 
 export function addSignals(newSignals: Signal[]) {

@@ -129,6 +129,7 @@ class SimulateEngine:
         self.results["errors"] = self.errors
         self.results["signals"] = self.signals
         self.results["candles_processed"] = candles_processed if self.running else 0
+        self.results["klines"] = self.klines  # Include klines for chart display
         self.results["started_at"] = self.started_at
         self.results["ended_at"] = datetime.utcnow()
 

@@ -93,6 +93,7 @@ class Simulation(Base):
     status = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
     signals = Column(JSON)
+    klines = Column(JSON)  # Price data for chart display
 
     bot = relationship("Bot", back_populates="simulations")
 

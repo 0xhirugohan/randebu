@@ -113,15 +113,16 @@ export interface Simulation {
 	id: string;
 	bot_id: string;
 	started_at: string;
-	status: 'running' | 'stopped';
+	status: 'running' | 'stopped' | 'completed';
 	config: SimulationConfig;
 	signals: Signal[] | null;
+	klines?: { time: number; close: number }[];
 }
 
 export interface SimulationConfig {
 	token: string;
-	interval_seconds: number;
-	auto_execute: boolean;
+	chain?: string;
+	kline_interval?: string;
 }
 
 export interface Signal {

@@ -31,42 +31,9 @@ def run_simulation_sync(
         engine.run_id = simulation_id
         running_simulations[simulation_id] = engine
         
-        def save_signals_to_db():
-            """Save current signals to database."""
-            db = SessionLocal()
-            try:
-                simulation = (
-                    db.query(Simulation).filter(Simulation.id == simulation_id).first()
-                )
-                if simulation:
-                    simulation.signals = engine.signals
-                    db.commit()
-            finally:
-                db.close()
-        
         try:
-            # Run engine in background with periodic signal saving
-            check_interval = config.get("check_interval", 60)
-            save_interval = min(check_interval, 30)  # Save at least every 30 seconds
-            
-            async def run_with_periodic_save():
-                last_save_time = time.time()
-                while engine.running and engine.status == "running":
-                    await asyncio.sleep(1)  # Check every second
-                    
-                    current_time = time.time()
-                    if current_time - last_save_time >= save_interval:
-                        save_signals_to_db()
-                        last_save_time = current_time
-                
-                # Final save when done
-                save_signals_to_db()
-            
-            # Run both the engine and periodic save concurrently
-            await asyncio.gather(
-                engine.run(),
-                run_with_periodic_save()
-            )
+            # Run simulation (now synchronous - processes klines quickly)
+            results = await engine.run()
             
             db = SessionLocal()
             try:
@@ -76,6 +43,11 @@ def run_simulation_sync(
                 if simulation:
                     simulation.status = engine.status
                     simulation.signals = engine.signals
+                    # Save klines for chart display (only time and close price)
+                    simulation.klines = [
+                        {"time": k.get("time"), "close": k.get("close")}
+                        for k in engine.klines
+                    ]
                     db.commit()
 
                 for signal in engine.signals:
@@ -163,6 +135,7 @@ async def start_simulation(
             "kline_interval": config.kline_interval,
         },
         signals=[],
+        klines=[],
     )
     db.add(simulation)
     db.commit()
@@ -237,6 +210,9 @@ def list_simulations(
         if sim.id in running_simulations:
             engine = running_simulations[sim.id]
             sim.signals = engine.get_signals()
+            # Include klines from running engine for chart display
+            if hasattr(engine, 'klines'):
+                sim.klines = [{"time": k.get("time"), "close": k.get("close")} for k in engine.klines]
 
     return simulations
 
