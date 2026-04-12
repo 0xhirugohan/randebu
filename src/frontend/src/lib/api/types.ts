@@ -117,12 +117,22 @@ export interface Simulation {
 	config: SimulationConfig;
 	signals: Signal[] | null;
 	klines?: { time: number; close: number }[];
+	trade_log?: TradeLogEntry[];
 }
 
 export interface SimulationConfig {
 	token: string;
 	chain?: string;
 	kline_interval?: string;
+}
+
+export interface TradeLogEntry {
+	time: number;
+	price: number;
+	action: 'buy' | 'sell' | 'hold';
+	reason: string;
+	position: number;
+	entry_price: number | null;
 }
 
 export interface Signal {

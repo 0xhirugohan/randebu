@@ -118,6 +118,7 @@ class SimulationResponse(BaseModel):
     config: dict
     signals: Optional[List[dict]]
     klines: Optional[List[dict]] = None  # Price data for chart
+    trade_log: Optional[List[dict]] = None  # Trade activity log
 
     class Config:
         from_attributes = True

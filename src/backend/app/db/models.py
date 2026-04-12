@@ -94,6 +94,7 @@ class Simulation(Base):
     config = Column(JSON, nullable=False)
     signals = Column(JSON)
     klines = Column(JSON)  # Price data for chart display
+    trade_log = Column(JSON)  # Trade activity log
 
     bot = relationship("Bot", back_populates="simulations")
 

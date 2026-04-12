@@ -6,10 +6,20 @@ export interface KlineData {
 	close: number;
 }
 
+export interface TradeLogEntry {
+	time: number;
+	price: number;
+	action: 'buy' | 'sell' | 'hold';
+	reason: string;
+	position: number;
+	entry_price: number | null;
+}
+
 export interface SimulationState {
 	currentSimulation: Simulation | null;
 	signals: Signal[];
 	klines: KlineData[];
+	tradeLog: TradeLogEntry[];
 	isLoading: boolean;
 	error: string | null;
 }
@@ -18,6 +28,7 @@ const initialState: SimulationState = {
 	currentSimulation: null,
 	signals: [],
 	klines: [],
+	tradeLog: [],
 	isLoading: false,
 	error: null
 };
@@ -28,7 +39,8 @@ export function setCurrentSimulation(simulation: Simulation | null) {
 	simulationStore.update(state => ({ 
 		...state, 
 		currentSimulation: simulation,
-		klines: simulation?.klines || []
+		klines: simulation?.klines || [],
+		tradeLog: simulation?.trade_log || []
 	}));
 }
 

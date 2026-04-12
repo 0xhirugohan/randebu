@@ -52,6 +52,8 @@ def run_simulation_sync(
                         {"time": k.get("time"), "close": k.get("close")}
                         for k in engine.klines
                     ]
+                    # Save trade log for dashboard
+                    simulation.trade_log = engine.trade_log
                     db.commit()
 
                 for signal in engine.signals:

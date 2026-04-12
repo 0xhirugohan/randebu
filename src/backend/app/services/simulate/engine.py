@@ -58,6 +58,9 @@ class SimulateEngine:
         # Kline data
         self.klines: List[Dict[str, Any]] = []
         self.last_processed_time: Optional[int] = None
+        
+        # Trade log - tracks what happened at each candle
+        self.trade_log: List[Dict[str, Any]] = []
 
     async def run(self) -> Dict[str, Any]:
         self.running = True
@@ -130,6 +133,7 @@ class SimulateEngine:
         self.results["signals"] = self.signals
         self.results["candles_processed"] = candles_processed if self.running else 0
         self.results["klines"] = self.klines  # Include klines for chart display
+        self.results["trade_log"] = self.trade_log  # Include trade log for dashboard
         self.results["started_at"] = self.started_at
         self.results["ended_at"] = datetime.utcnow()
 
@@ -165,19 +169,60 @@ class SimulateEngine:
     ):
         """Process a single candle - check conditions and risk management."""
         
+        action = "hold"  # Default action
+        reason = ""
+        
         # Check risk management first (for open positions)
         if self.position > 0 and self.entry_price is not None:
             exit_info = self._check_risk_management(close_price, timestamp)
             if exit_info:
                 await self._execute_risk_exit(close_price, timestamp, exit_info)
-                return  # Skip condition check if we just exited
+                action = "sell"
+                reason = exit_info["reason"]
+                # Log the action
+                self.trade_log.append({
+                    "time": timestamp,
+                    "price": close_price,
+                    "action": action,
+                    "reason": reason,
+                    "position": self.position,
+                    "entry_price": self.entry_price,
+                })
+                return
 
         # Check conditions (only if no open position)
         if self.position == 0:
             for condition in self.conditions:
                 if self._check_condition(condition, close_price, volume):
                     await self._execute_actions(close_price, timestamp, condition)
+                    action = "buy"
+                    reason = f"{condition.get('type')} {condition.get('threshold')}%".format(
+                        type=condition.get('type'),
+                        threshold=condition.get('threshold')
+                    )
+                    # Log the action
+                    self.trade_log.append({
+                        "time": timestamp,
+                        "price": close_price,
+                        "action": action,
+                        "reason": reason,
+                        "position": self.position,
+                        "entry_price": self.entry_price,
+                    })
                     break
+        
+        # Log hold action (no signal)
+        if action == "hold":
+            # Only log every 10th candle to reduce data
+            if len(self.trade_log) == 0 or (len(self.klines) - len(self.trade_log) > 10):
+                self.trade_log.append({
+                    "time": timestamp,
+                    "price": close_price,
+                    "action": "hold",
+                    "reason": "no_signal",
+                    "position": self.position,
+                    "entry_price": self.entry_price,
+                })
 
     def _check_risk_management(
         self, current_price: float, timestamp: int
