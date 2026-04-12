@@ -15,7 +15,7 @@ from typing import List, Optional, Dict, Any
 from datetime import timedelta
 
 from ...core.config import get_settings
-from ...db.models import Bot
+from ...db.models import Bot, Simulation
 
 
 SYSTEM_PROMPT = """You are a helpful AI trading assistant named Randebu. You help users manage their trading bots.
@@ -561,7 +561,6 @@ Would you like me to adjust the strategy parameters based on these results?"""
             import threading
             import uuid
             from ...core.database import SessionLocal
-            from ...db.models import Simulation
             from ...services.simulate.engine import SimulateEngine
             from ...core.config import get_settings
             from datetime import datetime
