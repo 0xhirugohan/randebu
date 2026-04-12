@@ -154,9 +154,17 @@ async def start_simulation(
     # Fetch klines SYNCHRONOUSLY so user can see chart immediately
     try:
         token_id = f"{config.token}-{config.chain}"
+        
+        # Calculate time range (last 1 hour)
+        import time
+        end_time = int(time.time() * 1000)
+        start_time = end_time - (60 * 60 * 1000)  # 1 hour ago
+        
         klines_data = await ave_client.get_klines(
             token_id,
             interval=config.kline_interval,
+            start_time=start_time,
+            end_time=end_time,
             limit=500
         )
         klines_for_chart = [

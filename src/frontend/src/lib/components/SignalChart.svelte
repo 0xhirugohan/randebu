@@ -41,12 +41,14 @@
 		// Clear
 		ctx.clearRect(0, 0, width, height);
 
-		// Get price data
-		const prices = klines.length > 0 
-			? klines.map(k => k.close)
-			: signals.map(s => s.price);
+		// Get price data (convert strings to numbers)
+		const priceData = klines.length > 0 
+			? klines.map(k => ({ time: k.time, price: parseFloat(k.close) || 0 }))
+			: signals.map(s => ({ time: 0, price: s.price }));
 		
-		if (prices.length === 0) return;
+		if (priceData.length === 0) return;
+
+		const prices = priceData.map(d => d.price);
 
 		const padding = { top: 20, right: 20, bottom: 30, left: 60 };
 		const chartWidth = width - padding.left - padding.right;
