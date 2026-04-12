@@ -61,8 +61,14 @@ def run_simulation_sync(
                     ]
                     simulation.trade_log = engine.trade_log
                     # Save portfolio data
-                    if hasattr(engine, 'current_balance') and engine.current_balance is not None:
-                        simulation.signals = [serialize_signal(s) for s in engine.signals]
+                    simulation.portfolio = {
+                        "initial_balance": engine.config.get("initial_balance", 10000),
+                        "current_balance": engine.current_balance,
+                        "position": engine.position,
+                        "position_token": engine.position_token,
+                        "entry_price": engine.entry_price,
+                        "current_price": engine.last_close,
+                    }
                     db.commit()
             finally:
                 db.close()
