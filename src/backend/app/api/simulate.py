@@ -116,6 +116,12 @@ async def start_simulation(
 
     settings = get_settings()
     simulation_id = str(uuid.uuid4())
+    
+    # Create AVE client for klines fetching
+    ave_client = AveCloudClient(
+        api_key=settings.AVE_API_KEY,
+        plan=settings.AVE_API_PLAN,
+    )
 
     simulation_config = {
         "bot_id": bot_id,
@@ -145,42 +151,30 @@ async def start_simulation(
     db.commit()
     db.refresh(simulation)
 
-    # Fetch klines synchronously first so user can see the chart immediately
-    # Then run simulation in background for signal processing
-    async def fetch_klines_and_run():
-        try:
-            # Fetch klines for chart display
-            token_id = f"{config.token}-{config.chain}"
-            ave_client = AveCloudClient(
-                api_key=settings.AVE_API_KEY,
-                plan=settings.AVE_API_PLAN,
-            )
-            klines_data = await ave_client.get_klines(
-                token_id,
-                interval=config.kline_interval,
-                limit=500
-            )
-            klines_for_chart = [
-                {"time": k.get("time"), "close": k.get("close")}
-                for k in sorted(klines_data, key=lambda x: x.get("time", 0))
-            ]
-            
-            # Save klines to DB immediately
-            db = SessionLocal()
-            try:
-                sim = db.query(Simulation).filter(Simulation.id == simulation_id).first()
-                if sim:
-                    sim.klines = klines_for_chart
-                    db.commit()
-            finally:
-                db.close()
-            
-            # Now run the full simulation in background
-            run_simulation_sync(simulation_id, str(settings.DATABASE_URL), bot_id, simulation_config)
-        except Exception as e:
-            logger.error(f"Failed to fetch klines: {e}")
-    
-    background_tasks.add_task(fetch_klines_and_run)
+    # Fetch klines SYNCHRONOUSLY so user can see chart immediately
+    try:
+        token_id = f"{config.token}-{config.chain}"
+        klines_data = await ave_client.get_klines(
+            token_id,
+            interval=config.kline_interval,
+            limit=500
+        )
+        klines_for_chart = [
+            {"time": k.get("time"), "close": k.get("close")}
+            for k in sorted(klines_data, key=lambda x: x.get("time", 0))
+        ]
+        # Update simulation with klines
+        simulation.klines = klines_for_chart
+        db.commit()
+        db.refresh(simulation)
+        logger.info(f"Fetched {len(klines_for_chart)} klines for simulation {simulation_id}")
+    except Exception as e:
+        logger.error(f"Failed to fetch klines: {e}")
+
+    # Run simulation in background for signal processing
+    background_tasks.add_task(
+        run_simulation_sync, simulation_id, str(settings.DATABASE_URL), bot_id, simulation_config
+    )
 
     return simulation
 
