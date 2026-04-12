@@ -293,6 +293,93 @@ class TestSimulateEngine:
         # Last close should be the last candle's close
         assert engine.last_close == 104.0
 
+    # ==================== Integration Tests ====================
+    
+    @pytest.mark.asyncio
+    async def test_full_simulation_workflow_generates_signals_and_trades(self):
+        """
+        Full integration test: provides klines with clear price movements
+        and verifies signals and trade_log are populated.
+        
+        This test ensures the simulation is working by:
+        1. Creating klines with obvious price movements (drops > 0.1%)
+        2. Using a very low threshold (0.1%)
+        3. Verifying signals are generated
+        4. Verifying trade_log is populated
+        5. Verifying we have buy/sell actions
+        """
+        # Create klines with clear price drops and rises
+        klines = [
+            {"time": 1000, "open": 100, "high": 101, "low": 99, "close": 100, "volume": 1000},  # Flat
+            {"time": 2000, "open": 100, "high": 101, "low": 99.9, "close": 99.95, "volume": 1000},  # 0.05% drop
+            {"time": 3000, "open": 99.95, "high": 100, "low": 99.5, "close": 99.5, "volume": 1000},  # 0.45% drop
+            {"time": 4000, "open": 99.5, "high": 100, "low": 99, "close": 99.2, "volume": 1000},   # 0.30% drop
+            {"time": 5000, "open": 99.2, "high": 100, "low": 98, "close": 98.5, "volume": 1000},   # 0.71% drop
+            {"time": 6000, "open": 98.5, "high": 99, "low": 98, "close": 98.8, "volume": 1000},    # 0.30% rise
+            {"time": 7000, "open": 98.8, "high": 99, "low": 98, "close": 98.3, "volume": 1000},   # 0.51% drop
+            {"time": 8000, "open": 98.3, "high": 99, "low": 97, "close": 97.5, "volume": 1000},   # 0.81% drop
+            {"time": 9000, "open": 97.5, "high": 98, "low": 96, "close": 96.5, "volume": 1000},   # 1.03% drop
+        ]
+        
+        # Use very low threshold to ensure signals are generated
+        config_override = {
+            "max_candles": 100,
+            "strategy_config": {
+                "conditions": [
+                    {"type": "price_drop", "threshold": 0.1, "token": "TEST", "token_address": "0x1234"}
+                ],
+                "actions": [
+                    {"type": "buy", "amount_percent": 10}
+                ],
+                "risk_management": {
+                    "stop_loss_percent": 5,
+                    "take_profit_percent": 5
+                }
+            }
+        }
+        
+        engine = create_engine(config_override=config_override, klines_data=klines)
+        engine.running = True
+        engine.run_id = "integration-test"
+        
+        results = await engine.run()
+        
+        # Verify results
+        print(f"\n=== Integration Test Results ===")
+        print(f"Status: {engine.status}")
+        print(f"Candles processed: {results.get('candles_processed')}")
+        print(f"Signals count: {len(engine.signals)}")
+        print(f"Trade log count: {len(engine.trade_log)}")
+        
+        # ASSERTIONS - These should NEVER fail if simulation is working
+        assert engine.status == "completed", "Simulation should complete successfully"
+        assert results.get("candles_processed") == len(klines), f"Should process all {len(klines)} candles"
+        
+        # Critical: signals should NOT be empty
+        assert len(engine.signals) > 0, "SIGNALS SHOULD NOT BE EMPTY! Simulation is not generating signals."
+        print(f"Signals: {[s['signal_type'] for s in engine.signals]}")
+        
+        # Critical: trade_log should NOT be empty
+        assert len(engine.trade_log) > 0, "TRADE_LOG SHOULD NOT BE EMPTY! No activity logged."
+        print(f"Trade log: {[t['action'] for t in engine.trade_log]}")
+        
+        # Should have at least one BUY signal
+        buy_signals = [s for s in engine.signals if s['signal_type'] == 'buy']
+        assert len(buy_signals) > 0, "Should have at least one BUY signal"
+        print(f"Buy signals: {len(buy_signals)}")
+        
+        # Verify trade_log has BUY action
+        buy_trades = [t for t in engine.trade_log if t['action'] == 'buy']
+        assert len(buy_trades) > 0, "Trade log should contain BUY actions"
+        
+        # Verify results contain the data
+        assert "signals" in results, "Results should contain signals"
+        assert "trade_log" in results, "Results should contain trade_log"
+        
+        print("\n=== Integration Test PASSED ===")
+        print(f"Simulation working correctly!")
+        print(f"Generated {len(engine.signals)} signals and {len(engine.trade_log)} trade log entries")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
