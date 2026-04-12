@@ -60,6 +60,9 @@ def run_simulation_sync(
                         for k in engine.klines
                     ]
                     simulation.trade_log = engine.trade_log
+                    # Save portfolio data
+                    if hasattr(engine, 'current_balance') and engine.current_balance is not None:
+                        simulation.signals = [serialize_signal(s) for s in engine.signals]
                     db.commit()
             finally:
                 db.close()

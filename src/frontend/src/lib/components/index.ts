@@ -4,6 +4,7 @@ export { default as BotSelector } from './BotSelector.svelte';
 export { default as StrategyPreview } from './StrategyPreview.svelte';
 export { default as SignalChart } from './SignalChart.svelte';
 export { default as TradeDashboard } from './TradeDashboard.svelte';
+export { default as PortfolioSummary } from './PortfolioSummary.svelte';
 export { default as BacktestChart } from './BacktestChart.svelte';
 export { default as ProUpgradeBanner } from './ProUpgradeBanner.svelte';
 export { default as TokenPicker } from './TokenPicker.svelte';

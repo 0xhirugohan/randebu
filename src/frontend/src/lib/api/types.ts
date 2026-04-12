@@ -118,6 +118,7 @@ export interface Simulation {
 	signals: Signal[] | null;
 	klines?: { time: number; close: number }[];
 	trade_log?: TradeLogEntry[];
+	portfolio?: Portfolio;
 	current_candle_index?: number;
 	total_candles?: number;
 	candles_processed?: number;
@@ -136,6 +137,15 @@ export interface TradeLogEntry {
 	reason: string;
 	position: number;
 	entry_price: number | null;
+}
+
+export interface Portfolio {
+	initial_balance: number;
+	current_balance: number;
+	position: number;
+	position_token: string;
+	entry_price: number;
+	current_price: number;
 }
 
 export interface Signal {

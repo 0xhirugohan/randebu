@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { isAuthenticated, isLoading, currentBotStore, setCurrentBot, simulationStore, setCurrentSimulation, addSignals, clearSignals, setSimulationLoading, setSimulationError } from '$lib/stores';
 	import { api } from '$lib/api';
-	import { SignalChart, TradeDashboard } from '$lib/components';
+	import { SignalChart, TradeDashboard, PortfolioSummary } from '$lib/components';
 
 	let botId = $derived($page.params.id);
 	let tokenName = $state('');
@@ -155,7 +155,18 @@
 		</section>
 
 		<section class="signals-section">
-			<h2>Price Chart</h2>
+			<h2>Portfolio</h2>
+			
+			<PortfolioSummary 
+				initialBalance={$simulationStore.currentSimulation?.portfolio?.initial_balance || 10000}
+				currentBalance={$simulationStore.currentSimulation?.portfolio?.current_balance || 10000}
+				position={$simulationStore.currentSimulation?.portfolio?.position || 0}
+				positionToken={$simulationStore.currentSimulation?.portfolio?.position_token || ''}
+				entryPrice={$simulationStore.currentSimulation?.portfolio?.entry_price || 0}
+				currentPrice={$simulationStore.currentSimulation?.portfolio?.current_price || 0}
+			/>
+			
+			<h2 style="margin-top: 1.5rem;">Price Chart</h2>
 			
 			<SignalChart signals={$simulationStore.signals} klines={$simulationStore.currentSimulation?.klines || []} height={250} />
 			

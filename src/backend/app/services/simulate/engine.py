@@ -169,6 +169,14 @@ class SimulateEngine:
         self.results["total_candles"] = self.total_candles
         self.results["klines"] = self.klines  # Include klines for chart display
         self.results["trade_log"] = self.trade_log  # Include trade log for dashboard
+        self.results["portfolio"] = {
+            "initial_balance": self.config.get("initial_balance", 10000),
+            "current_balance": self.current_balance,
+            "position": self.position,
+            "position_token": self.position_token,
+            "entry_price": self.entry_price,
+            "current_price": self.last_close,
+        }
         self.results["started_at"] = self.started_at
         self.results["ended_at"] = datetime.utcnow()
 

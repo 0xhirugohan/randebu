@@ -15,11 +15,21 @@ export interface TradeLogEntry {
 	entry_price: number | null;
 }
 
+export interface Portfolio {
+	initial_balance: number;
+	current_balance: number;
+	position: number;
+	position_token: string;
+	entry_price: number;
+	current_price: number;
+}
+
 export interface SimulationState {
 	currentSimulation: Simulation | null;
 	signals: Signal[];
 	klines: KlineData[];
 	tradeLog: TradeLogEntry[];
+	portfolio: Portfolio;
 	isLoading: boolean;
 	error: string | null;
 }
@@ -29,6 +39,14 @@ const initialState: SimulationState = {
 	signals: [],
 	klines: [],
 	tradeLog: [],
+	portfolio: {
+		initial_balance: 10000,
+		current_balance: 10000,
+		position: 0,
+		position_token: '',
+		entry_price: 0,
+		current_price: 0
+	},
 	isLoading: false,
 	error: null
 };
@@ -40,7 +58,15 @@ export function setCurrentSimulation(simulation: Simulation | null) {
 		...state, 
 		currentSimulation: simulation,
 		klines: simulation?.klines || [],
-		tradeLog: simulation?.trade_log || []
+		tradeLog: simulation?.trade_log || [],
+		portfolio: simulation?.portfolio || state.portfolio
+	}));
+}
+
+export function updatePortfolio(portfolio: Partial<Portfolio>) {
+	simulationStore.update(state => ({
+		...state,
+		portfolio: { ...state.portfolio, ...portfolio }
 	}));
 }
 
