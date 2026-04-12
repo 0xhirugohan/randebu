@@ -145,7 +145,7 @@ async def start_simulation(
         "bot_id": bot_id,
         "token": config.token,
         "chain": config.chain,
-        "check_interval": config.check_interval,
+        "kline_interval": config.kline_interval,
         "auto_execute": False,  # Always paper trade
         "strategy_config": bot.strategy_config,
         "ave_api_key": settings.AVE_API_KEY,
@@ -160,7 +160,7 @@ async def start_simulation(
         config={
             "token": config.token,
             "chain": config.chain,
-            "check_interval": config.check_interval,
+            "kline_interval": config.kline_interval,
         },
         signals=[],
     )

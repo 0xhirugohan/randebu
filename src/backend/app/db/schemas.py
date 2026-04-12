@@ -100,7 +100,7 @@ class BacktestResponse(BaseModel):
 class SimulationCreate(BaseModel):
     token: str
     chain: str
-    check_interval: int = 60
+    kline_interval: str = "1m"
 
     @field_validator("chain")
     @classmethod

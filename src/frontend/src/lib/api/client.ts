@@ -189,7 +189,7 @@ export const api = {
 	},
 
 	simulate: {
-		async start(botId: string, config: { token: string; chain?: string; check_interval: number }): Promise<Simulation> {
+		async start(botId: string, config: { token: string; chain?: string; kline_interval: string }): Promise<Simulation> {
 			const response = await fetch(`${API_URL}/bots/${botId}/simulate`, {
 				method: 'POST',
 				headers: getAuthHeaders(),

@@ -9,7 +9,7 @@
 	let botId = $derived($page.params.id);
 	let tokenName = $state('');
 	let tokenAddress = $state('');
-	let intervalSeconds = $state(60);
+	let klineInterval = $state('1m');
 	let isRunning = $state(false);
 
 	onMount(async () => {
@@ -70,7 +70,7 @@
 			const simulation = await api.simulate.start(botId, {
 				token: tokenAddress,
 				chain: 'bsc',
-				check_interval: intervalSeconds
+				kline_interval: klineInterval
 			});
 			setCurrentSimulation(simulation);
 			clearSignals();
@@ -132,11 +132,12 @@
 						</div>
 					</div>
 					<div class="field">
-						<label for="interval">Check Interval</label>
-						<select id="interval" bind:value={intervalSeconds} disabled={isRunning}>
-							<option value={10}>Every 10 seconds</option>
-							<option value={30}>Every 30 seconds</option>
-							<option value={60}>Every minute</option>
+						<label for="klineInterval">Kline Interval</label>
+						<select id="klineInterval" bind:value={klineInterval} disabled={isRunning}>
+							<option value="1m">1 minute</option>
+							<option value="5m">5 minutes</option>
+							<option value="15m">15 minutes</option>
+							<option value="1h">1 hour</option>
 						</select>
 					</div>
 				</div>
