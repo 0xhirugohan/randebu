@@ -89,7 +89,7 @@
 		if (priceData.length === 0) return;
 
 		const prices = priceData.map(d => d.price);
-		const padding = { top: 20, right: 20, bottom: 30, left: 60 };
+		const padding = { top: 20, right: 20, bottom: 45, left: 60 };  // More bottom padding for time labels
 		const chartWidth = width - padding.left - padding.right;
 		const chartHeight = height - padding.top - padding.bottom;
 
@@ -189,6 +189,28 @@
 			});
 		}
 
+		// Draw X axis time labels
+		ctx.fillStyle = '#666';
+		ctx.font = '9px monospace';
+		ctx.textAlign = 'center';
+		
+		const numTimeLabels = Math.min(5, priceData.length);
+		for (let i = 0; i < numTimeLabels; i++) {
+			const dataIndex = Math.floor(i * (priceData.length - 1) / (numTimeLabels - 1 || 1));
+			const x = indexToX(dataIndex);
+			
+			// Convert timestamp to readable time
+			let timeLabel = '';
+			if (priceData[dataIndex].time > 0) {
+				const date = new Date(priceData[dataIndex].time * 1000);
+				timeLabel = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+			} else {
+				timeLabel = `${dataIndex + 1}`;
+			}
+			
+			ctx.fillText(timeLabel, x, height - 5);
+		}
+
 		// Legend
 		ctx.fillStyle = '#888';
 		ctx.font = '12px sans-serif';
@@ -197,9 +219,9 @@
 		if (signals.length > 0) {
 			const buyCount = signals.filter(s => s.signal_type === 'buy').length;
 			const sellCount = signals.filter(s => s.signal_type === 'sell').length;
-			ctx.fillText(`📈 ${buyCount} Buy | ${sellCount} Sell | ${priceData.length} Candles`, width / 2, height - 8);
+			ctx.fillText(`📈 ${buyCount} Buy | ${sellCount} Sell | ${priceData.length} Candles`, width / 2, height - 20);
 		} else {
-			ctx.fillText(`${priceData.length} Candles (No signals generated)`, width / 2, height - 8);
+			ctx.fillText(`${priceData.length} Candles (No signals generated)`, width / 2, height - 20);
 		}
 	}
 </script>
