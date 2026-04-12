@@ -155,13 +155,15 @@
 		</section>
 
 		<section class="signals-section">
-			<h2>Signals ({$simulationStore.signals.length})</h2>
+			<h2>Price Chart</h2>
+			
+			<SignalChart signals={$simulationStore.signals} klines={$simulationStore.currentSimulation?.klines || []} height={250} />
+			
+			<h2 style="margin-top: 1.5rem;">Signals ({$simulationStore.signals.length})</h2>
 			
 			{#if $simulationStore.signals.length === 0}
-				<p class="empty-state">No signals yet. Start a simulation to see trading signals.</p>
+				<p class="empty-state">No signals generated. The chart above shows price movement.</p>
 			{:else}
-				<SignalChart signals={$simulationStore.signals} klines={$simulationStore.currentSimulation?.klines || []} height={200} />
-				
 				<div class="signals-list">
 					{#each $simulationStore.signals as signal}
 						<div class="signal-card">
