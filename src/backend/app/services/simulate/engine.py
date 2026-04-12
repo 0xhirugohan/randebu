@@ -69,12 +69,14 @@ class SimulateEngine:
                         current_volume = float(price_data.get("volume", 0))
 
                         if current_price > 0:
-                            await self._check_conditions(
-                                current_price, current_volume, price_data
-                            )
-
-                        self.last_price = current_price
-                        self.last_volume = current_volume
+                            # Only check conditions if we have a previous price to compare
+                            if self.last_price is not None:
+                                await self._check_conditions(
+                                    current_price, current_volume, price_data
+                                )
+                            # Update last price AFTER checking (so next iteration has comparison data)
+                            self.last_price = current_price
+                            self.last_volume = current_volume
 
                 except Exception as e:
                     logger.warning(f"Failed to get price for {token_id}: {e}")
