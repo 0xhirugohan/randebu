@@ -86,10 +86,9 @@ def run_simulation_sync(
                 engine.run(),
                 run_with_progress_save()
             )
-
-            finally:
-                db.close()
         finally:
+            # Save final state
+            save_progress()
             if simulation_id in running_simulations:
                 del running_simulations[simulation_id]
 
