@@ -1,5 +1,6 @@
 import uuid
 import asyncio
+import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -11,6 +12,9 @@ from ..core.database import get_db
 from ..core.config import get_settings
 from ..db.schemas import SimulationCreate, SimulationResponse
 from ..db.models import Bot, Simulation, Signal, User
+from ..services.ave.client import AveCloudClient
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -141,10 +145,42 @@ async def start_simulation(
     db.commit()
     db.refresh(simulation)
 
-    db_url = str(settings.DATABASE_URL)
-    background_tasks.add_task(
-        run_simulation_sync, simulation_id, db_url, bot_id, simulation_config
-    )
+    # Fetch klines synchronously first so user can see the chart immediately
+    # Then run simulation in background for signal processing
+    async def fetch_klines_and_run():
+        try:
+            # Fetch klines for chart display
+            token_id = f"{config.token}-{config.chain}"
+            ave_client = AveCloudClient(
+                api_key=settings.AVE_API_KEY,
+                plan=settings.AVE_API_PLAN,
+            )
+            klines_data = await ave_client.get_klines(
+                token_id,
+                interval=config.kline_interval,
+                limit=500
+            )
+            klines_for_chart = [
+                {"time": k.get("time"), "close": k.get("close")}
+                for k in sorted(klines_data, key=lambda x: x.get("time", 0))
+            ]
+            
+            # Save klines to DB immediately
+            db = SessionLocal()
+            try:
+                sim = db.query(Simulation).filter(Simulation.id == simulation_id).first()
+                if sim:
+                    sim.klines = klines_for_chart
+                    db.commit()
+            finally:
+                db.close()
+            
+            # Now run the full simulation in background
+            run_simulation_sync(simulation_id, str(settings.DATABASE_URL), bot_id, simulation_config)
+        except Exception as e:
+            logger.error(f"Failed to fetch klines: {e}")
+    
+    background_tasks.add_task(fetch_klines_and_run)
 
     return simulation
 
