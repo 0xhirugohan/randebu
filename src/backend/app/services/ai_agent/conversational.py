@@ -12,6 +12,7 @@ import json
 import re
 import requests
 from typing import List, Optional, Dict, Any
+from datetime import timedelta
 
 from ...core.config import get_settings
 from ...db.models import Bot
@@ -96,6 +97,36 @@ TOOLS = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_backtest",
+            "description": "Run a backtest to evaluate how the current trading strategy would have performed historically. Returns key metrics like ROI, win rate, max drawdown, etc. Use this when user asks to backtest, test strategy, or check historical performance.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "token_address": {
+                        "type": "string",
+                        "description": "The BSC contract address of the token to backtest (required)"
+                    },
+                    "timeframe": {
+                        "type": "string",
+                        "description": "Timeframe for klines: '1d' (1 day), '4h' (4 hours), '1h' (1 hour), '15m' (15 minutes)",
+                        "default": "1d"
+                    },
+                    "start_date": {
+                        "type": "string",
+                        "description": "Start date for backtest in YYYY-MM-DD format (e.g., '2024-01-01')"
+                    },
+                    "end_date": {
+                        "type": "string",
+                        "description": "End date for backtest in YYYY-MM-DD format (e.g., '2024-12-01')"
+                    }
+                },
+                "required": ["token_address"]
+            }
+        }
     }
 ]
 
@@ -103,12 +134,13 @@ SYSTEM_PROMPT_WITH_TOOLS = SYSTEM_PROMPT + """
 
 You have access to tools:
 - search_tokens(chain, limit): Search for trending tokens on a blockchain. Use it when user asks for token recommendations or trending tokens.
+- run_backtest(token_address, timeframe, start_date, end_date): Run a backtest on historical data. Returns performance metrics. Use when user asks to backtest or check historical performance.
 
 When you want to use a tool, respond with:
 {
   "thinking": "...",
-  "response": "Searching for trending tokens...",
-  "tool_call": {"name": "search_tokens", "arguments": {"chain": "bsc", "limit": 10}}
+  "response": "Running backtest...",
+  "tool_call": {"name": "run_backtest", "arguments": {"token_address": "0x...", "timeframe": "1d", "start_date": "2024-01-01", "end_date": "2024-12-01"}}
 }
 """
 
@@ -180,8 +212,10 @@ class ConversationalAgent:
                     if tool_calls:
                         for tool_call in tool_calls:
                             func = tool_call.get("function", {})
-                            if func.get("name") == "search_tokens":
-                                args = json.loads(func.get("arguments", "{}"))
+                            func_name = func.get("name", "")
+                            args = json.loads(func.get("arguments", "{}"))
+                            
+                            if func_name == "search_tokens":
                                 chain = "bsc"  # Always BSC
                                 limit = args.get("limit", 10)
                                 
@@ -213,6 +247,28 @@ class ConversationalAgent:
                                 # Return the tool result directly
                                 return {
                                     "response": response_text,
+                                    "thinking": thinking,
+                                    "strategy_updated": False,
+                                    "strategy_needs_confirmation": False,
+                                    "success": True
+                                }
+                            
+                            elif func_name == "run_backtest":
+                                token_address = args.get("token_address")
+                                timeframe = args.get("timeframe", "1d")
+                                start_date = args.get("start_date")
+                                end_date = args.get("end_date")
+                                
+                                # Execute backtest
+                                backtest_result = self._execute_backtest(
+                                    token_address=token_address,
+                                    timeframe=timeframe,
+                                    start_date=start_date,
+                                    end_date=end_date
+                                )
+                                
+                                return {
+                                    "response": backtest_result,
                                     "thinking": thinking,
                                     "strategy_updated": False,
                                     "strategy_needs_confirmation": False,
@@ -358,6 +414,91 @@ class ConversationalAgent:
                 "strategy_updated": False,
                 "success": False
             }
+    
+    def _execute_backtest(
+        self,
+        token_address: str,
+        timeframe: str = "1d",
+        start_date: str = None,
+        end_date: str = None
+    ) -> str:
+        """Execute a backtest using the bot's current strategy."""
+        try:
+            from ...core.database import get_db
+            from ...db.models import Backtest
+            from ...services.backtest.engine import BacktestEngine
+            from ...core.config import get_settings
+            from datetime import datetime
+            import uuid
+            
+            settings = get_settings()
+            db = next(get_db())
+            
+            # Get the bot
+            bot = db.query(Bot).filter(Bot.id == self.bot_id).first()
+            if not bot:
+                return "I couldn't find the bot. Please try again."
+            
+            # Default dates if not provided (last 30 days)
+            if not end_date:
+                end_date = datetime.now().strftime("%Y-%m-%d")
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+            
+            # Create backtest engine
+            backtest_config = {
+                "bot_id": self.bot_id,
+                "token": token_address,
+                "chain": "bsc",
+                "timeframe": timeframe,
+                "start_date": start_date,
+                "end_date": end_date,
+                "strategy_config": bot.strategy_config,
+                "ave_api_key": settings.AVE_API_KEY,
+                "ave_api_plan": settings.AVE_API_PLAN,
+                "initial_balance": 10000.0,
+            }
+            
+            engine = BacktestEngine(backtest_config)
+            results = asyncio.run(engine.run())
+            
+            # Format results for display
+            if "error" in results:
+                return f"Backtest failed: {results['error']}"
+            
+            total_return = results.get("total_return", 0)
+            win_rate = results.get("win_rate", 0)
+            total_trades = results.get("total_trades", 0)
+            max_drawdown = results.get("max_drawdown", 0)
+            sharpe_ratio = results.get("sharpe_ratio", 0)
+            final_balance = results.get("final_balance", 10000)
+            
+            # Format return with emoji indicators
+            return_emoji = "📈" if total_return >= 0 else "📉"
+            return_str = f"+{total_return:.2f}%" if total_return >= 0 else f"{total_return:.2f}%"
+            
+            drawdown_emoji = "⚠️" if abs(max_drawdown) > 10 else "✅"
+            
+            response = f"""Here's the backtest result for {token_address}:
+
+**Performance Summary**
+{return_emoji} Total Return: {return_str}
+💰 Final Balance: ${final_balance:,.2f}
+📊 Total Trades: {total_trades}
+🎯 Win Rate: {win_rate:.1f}%
+
+**Risk Metrics**
+{drawdown_emoji} Max Drawdown: {max_drawdown:.2f}%
+📉 Sharpe Ratio: {sharpe_ratio:.2f}
+
+**Period**: {start_date} to {end_date} ({timeframe})
+
+Would you like me to adjust the strategy parameters based on these results?"""
+            
+            return response
+            
+        except Exception as e:
+            return f"I encountered an error running the backtest: {str(e)}"
     
     def _update_strategy(self, strategy_update: Dict) -> bool:
         """Update the bot's strategy in the database."""
