@@ -294,12 +294,19 @@ class SimulateEngine:
             return
 
         reason = exit_info["reason"]
+        quantity = self.position
+        sale_proceeds = quantity * price
+        
+        # Add sale proceeds to cash balance
+        self.current_balance += sale_proceeds
+        
         self.trades.append(
             {
                 "type": "sell",
                 "token": self.position_token,
                 "price": price,
-                "quantity": self.position,
+                "quantity": quantity,
+                "amount": sale_proceeds,
                 "timestamp": timestamp,
                 "exit_reason": reason,
             }
