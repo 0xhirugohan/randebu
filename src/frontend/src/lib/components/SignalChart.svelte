@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Signal } from '$lib/api';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	interface Props {
 		signals?: Signal[];
@@ -13,22 +13,50 @@
 	let width = $state(800);
 	let containerEl: HTMLDivElement;
 	let canvasEl: HTMLCanvasElement;
+	let initialized = $state(false);
 
 	onMount(() => {
+		// Set initial width
 		if (containerEl) {
 			width = containerEl.clientWidth;
-			drawChart();
 		}
+		
+		// Resize observer
+		const resizeObserver = new ResizeObserver(entries => {
+			for (const entry of entries) {
+				width = entry.contentRect.width;
+				drawChart();
+			}
+		});
+		
+		if (containerEl) {
+			resizeObserver.observe(containerEl);
+		}
+		
+		initialized = true;
+		
+		return () => {
+			resizeObserver.disconnect();
+		};
 	});
 
+	// Draw when data changes
 	$effect(() => {
-		if (canvasEl && (signals.length > 0 || klines.length > 0)) {
+		// Access reactive values to trigger effect
+		const currentSignals = signals;
+		const currentKlines = klines;
+		const currentWidth = width;
+		
+		// Wait for DOM to be ready
+		tick().then(() => {
 			drawChart();
-		}
+		});
 	});
 
 	function drawChart() {
-		if (!canvasEl) return;
+		if (!canvasEl) {
+			return;
+		}
 		
 		const ctx = canvasEl.getContext('2d');
 		if (!ctx) return;
@@ -38,18 +66,29 @@
 		canvasEl.height = height * dpr;
 		ctx.scale(dpr, dpr);
 
-		// Clear
+		// Clear canvas
 		ctx.clearRect(0, 0, width, height);
 
-		// Get price data (convert strings to numbers)
-		const priceData = klines.length > 0 
-			? klines.map(k => ({ time: k.time, price: parseFloat(k.close) || 0 }))
-			: signals.map(s => ({ time: 0, price: s.price }));
+		// Check if we have data
+		if (klines.length === 0 && signals.length === 0) {
+			return;
+		}
+
+		// Get price data
+		let priceData: { time: number; price: number }[] = [];
+		
+		if (klines.length > 0) {
+			priceData = klines.map(k => ({
+				time: k.time,
+				price: typeof k.close === 'string' ? parseFloat(k.close) : k.close
+			})).filter(d => !isNaN(d.price) && d.price > 0);
+		} else if (signals.length > 0) {
+			priceData = signals.map(s => ({ time: 0, price: s.price }));
+		}
 		
 		if (priceData.length === 0) return;
 
 		const prices = priceData.map(d => d.price);
-
 		const padding = { top: 20, right: 20, bottom: 30, left: 60 };
 		const chartWidth = width - padding.left - padding.right;
 		const chartHeight = height - padding.top - padding.bottom;
@@ -66,7 +105,7 @@
 		}
 
 		function indexToX(index: number): number {
-			return padding.left + (index / (prices.length - 1 || 1)) * chartWidth;
+			return padding.left + (index / Math.max(prices.length - 1, 1)) * chartWidth;
 		}
 
 		// Draw grid lines
@@ -81,7 +120,7 @@
 		}
 
 		// Draw Y axis labels
-		ctx.fillStyle = '#666';
+		ctx.fillStyle = '#888';
 		ctx.font = '10px monospace';
 		ctx.textAlign = 'right';
 		for (let i = 0; i <= 4; i++) {
@@ -94,11 +133,9 @@
 		ctx.beginPath();
 		ctx.strokeStyle = '#667eea';
 		ctx.lineWidth = 2;
-		for (let i = 0; i < prices.length; i++) {
-			const x = indexToX(i);
-			const y = priceToY(prices[i]);
-			if (i === 0) ctx.moveTo(x, y);
-			else ctx.lineTo(x, y);
+		ctx.moveTo(indexToX(0), priceToY(prices[0]));
+		for (let i = 1; i < prices.length; i++) {
+			ctx.lineTo(indexToX(i), priceToY(prices[i]));
 		}
 		ctx.stroke();
 
@@ -107,71 +144,75 @@
 		ctx.lineTo(indexToX(0), padding.top + chartHeight);
 		ctx.closePath();
 		const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
-		gradient.addColorStop(0, 'rgba(102, 126, 234, 0.2)');
+		gradient.addColorStop(0, 'rgba(102, 126, 234, 0.3)');
 		gradient.addColorStop(1, 'rgba(102, 126, 234, 0)');
 		ctx.fillStyle = gradient;
 		ctx.fill();
 
 		// Draw signal markers
 		if (signals.length > 0) {
-			// Draw line to each signal point
 			signals.forEach((signal) => {
-				const signalIndex = klines.length > 0 
-					? klines.findIndex(k => Math.abs(k.close - signal.price) < 0.0001)
-					: signals.indexOf(signal);
+				// Find closest price match
+				const signalPrice = signal.price;
+				let closestIndex = 0;
+				let closestDiff = Infinity;
 				
-				if (signalIndex >= 0) {
-					const x = indexToX(signalIndex);
-					const y = priceToY(signal.price);
-
-					// Vertical line from top
-					ctx.beginPath();
-					ctx.strokeStyle = signal.signal_type === 'buy' ? '#22c55e' : '#ef4444';
-					ctx.setLineDash([4, 4]);
-					ctx.moveTo(x, padding.top);
-					ctx.lineTo(x, y);
-					ctx.stroke();
-					ctx.setLineDash([]);
-
-					// Signal dot
-					ctx.beginPath();
-					ctx.arc(x, y, 6, 0, Math.PI * 2);
-					ctx.fillStyle = signal.signal_type === 'buy' ? '#22c55e' : '#ef4444';
-					ctx.fill();
-					ctx.strokeStyle = '#fff';
-					ctx.lineWidth = 2;
-					ctx.stroke();
+				for (let i = 0; i < priceData.length; i++) {
+					const diff = Math.abs(priceData[i].price - signalPrice);
+					if (diff < closestDiff) {
+						closestDiff = diff;
+						closestIndex = i;
+					}
 				}
+				
+				const x = indexToX(closestIndex);
+				const y = priceToY(signalPrice);
+				const color = signal.signal_type === 'buy' ? '#22c55e' : '#ef4444';
+
+				// Vertical dashed line
+				ctx.beginPath();
+				ctx.strokeStyle = color;
+				ctx.setLineDash([4, 4]);
+				ctx.moveTo(x, padding.top);
+				ctx.lineTo(x, y);
+				ctx.stroke();
+				ctx.setLineDash([]);
+
+				// Signal dot
+				ctx.beginPath();
+				ctx.arc(x, y, 6, 0, Math.PI * 2);
+				ctx.fillStyle = color;
+				ctx.fill();
+				ctx.strokeStyle = '#fff';
+				ctx.lineWidth = 2;
+				ctx.stroke();
 			});
 		}
 
 		// Legend
+		ctx.fillStyle = '#888';
+		ctx.font = '12px sans-serif';
+		ctx.textAlign = 'center';
+		
 		if (signals.length > 0) {
 			const buyCount = signals.filter(s => s.signal_type === 'buy').length;
 			const sellCount = signals.filter(s => s.signal_type === 'sell').length;
-
-			ctx.fillStyle = '#888';
-			ctx.font = '12px sans-serif';
-			ctx.textAlign = 'center';
-			ctx.fillText(`📈 ${buyCount} Buy | ${sellCount} Sell | ${prices.length} Candles`, width / 2, height - 8);
-		} else if (klines.length > 0) {
-			ctx.fillStyle = '#888';
-			ctx.font = '12px sans-serif';
-			ctx.textAlign = 'center';
-			ctx.fillText(`${prices.length} Candles (No signals generated)`, width / 2, height - 8);
+			ctx.fillText(`📈 ${buyCount} Buy | ${sellCount} Sell | ${priceData.length} Candles`, width / 2, height - 8);
+		} else {
+			ctx.fillText(`${priceData.length} Candles (No signals generated)`, width / 2, height - 8);
 		}
 	}
 </script>
 
 <div class="signal-chart" bind:this={containerEl}>
-	{#if signals.length === 0 && klines.length === 0}
+	{#if klines.length === 0 && signals.length === 0}
 		<div class="empty-state">
 			<p>No data to display. Start a simulation to see price movements.</p>
 		</div>
 	{:else}
 		<canvas 
-			bind:this={canvasEl} 
-			style="width: {width}px; height: {height}px;"
+			bind:this={canvasEl}
+			style="width: 100%; height: {height}px;"
 		></canvas>
 	{/if}
 </div>
@@ -198,5 +239,6 @@
 
 	canvas {
 		display: block;
+		width: 100%;
 	}
 </style>
