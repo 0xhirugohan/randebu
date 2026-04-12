@@ -272,10 +272,15 @@ def stop_simulation(
             status_code=status.HTTP_404_NOT_FOUND, detail="Simulation not found"
         )
 
+    # Always update status to stopped, even if engine is not in memory
+    simulation.status = "stopped"
+    
+    # Try to stop the engine if it's still in memory
     if run_id in running_simulations:
         engine = running_simulations[run_id]
         engine.stop()
-        simulation.status = "stopped"
-        db.commit()
+        del running_simulations[run_id]
+    
+    db.commit()
 
-    return {"status": "stopping", "run_id": run_id}
+    return {"status": "stopped", "run_id": run_id}
