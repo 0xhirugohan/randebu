@@ -109,7 +109,7 @@
 
 	<div class="notice">
 		<span class="notice-icon">⚠️</span>
-		<span>Simulation Mode - Using REST polling (every {intervalSeconds}s). For real-time signals, consider upgrading to Pro tier.</span>
+		<span>Simulation Mode - Running on {klineInterval} kline data. Stop simulation to see results.</span>
 	</div>
 
 	<div class="content">
