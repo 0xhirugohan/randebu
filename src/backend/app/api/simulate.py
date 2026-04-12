@@ -131,11 +131,12 @@ async def start_simulation(
         .first()
     )
     if existing_simulation:
-        # Return existing running simulation
+        # Stop the existing simulation first
         if existing_simulation.id in running_simulations:
-            engine = running_simulations[existing_simulation.id]
-            existing_simulation.signals = engine.get_signals()
-        return existing_simulation
+            running_simulations[existing_simulation.id].stop()
+            del running_simulations[existing_simulation.id]
+        existing_simulation.status = "stopped"
+        db.commit()
 
     settings = get_settings()
     simulation_id = str(uuid.uuid4())
@@ -163,9 +164,7 @@ async def start_simulation(
         config={
             "token": config.token,
             "chain": config.chain,
-            "duration_seconds": config.duration_seconds,
             "check_interval": check_interval,
-            "auto_execute": config.auto_execute,
         },
         signals=[],
     )

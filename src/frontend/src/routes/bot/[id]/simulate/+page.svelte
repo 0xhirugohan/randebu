@@ -44,15 +44,17 @@
 	async function loadSimulations() {
 		try {
 			const simulations = await api.simulate.list(botId);
-			if (simulations.length > 0) {
-				const latest = simulations[0];
-				setCurrentSimulation(latest);
-				if (latest.signals) {
-					addSignals(latest.signals);
+			
+			// Find the most recent running simulation, or fall back to most recent
+			let current = simulations.find(s => s.status === 'running') || simulations[0];
+			
+			if (current) {
+				setCurrentSimulation(current);
+				clearSignals();
+				if (current.signals && current.signals.length > 0) {
+					addSignals(current.signals);
 				}
-				if (latest.status === 'running') {
-					isRunning = true;
-				}
+				isRunning = current.status === 'running';
 			}
 		} catch (e) {
 			console.error('Failed to load simulations:', e);
