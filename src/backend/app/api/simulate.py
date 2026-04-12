@@ -39,6 +39,16 @@ def run_simulation_sync(
             # Run simulation (now synchronous - processes klines quickly)
             results = await engine.run()
             
+            # Serialize signals for JSON storage (convert datetime to string)
+            def serialize_signal(s):
+                created = s.get("created_at")
+                if hasattr(created, "isoformat"):
+                    created = created.isoformat()
+                return {
+                    **s,
+                    "created_at": created
+                }
+            
             db = SessionLocal()
             try:
                 simulation = (
@@ -46,7 +56,7 @@ def run_simulation_sync(
                 )
                 if simulation:
                     simulation.status = engine.status
-                    simulation.signals = engine.signals
+                    simulation.signals = [serialize_signal(s) for s in engine.signals]
                     # Save klines for chart display (only time and close price)
                     simulation.klines = [
                         {"time": k.get("time"), "close": k.get("close")}
@@ -57,6 +67,10 @@ def run_simulation_sync(
                     db.commit()
 
                 for signal in engine.signals:
+                    created_at = signal.get("created_at")
+                    if hasattr(created_at, "isoformat"):
+                        created_at = created_at.isoformat()
+                    
                     db_signal = Signal(
                         id=signal["id"],
                         bot_id=signal["bot_id"],
@@ -67,7 +81,7 @@ def run_simulation_sync(
                         confidence=signal.get("confidence"),
                         reasoning=signal.get("reasoning"),
                         executed=signal.get("executed", False),
-                        created_at=signal["created_at"],
+                        created_at=created_at,
                     )
                     db.add(db_signal)
                 db.commit()
