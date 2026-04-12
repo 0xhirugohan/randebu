@@ -557,14 +557,14 @@ Would you like me to adjust the strategy parameters based on these results?"""
     ) -> str:
         """Manage trading simulations: start, stop, status, or results."""
         try:
+            import asyncio
+            import threading
+            import uuid
             from ...core.database import SessionLocal
             from ...db.models import Simulation
             from ...services.simulate.engine import SimulateEngine
             from ...core.config import get_settings
             from datetime import datetime
-            import asyncio
-            import uuid
-            import threading
             
             db = SessionLocal()
             settings = get_settings()
