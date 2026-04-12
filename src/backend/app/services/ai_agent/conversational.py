@@ -424,6 +424,7 @@ class ConversationalAgent:
     ) -> str:
         """Execute a backtest using the bot's current strategy."""
         try:
+            import asyncio
             from ...core.database import get_db
             from ...db.models import Backtest
             from ...services.backtest.engine import BacktestEngine
