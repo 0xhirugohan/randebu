@@ -144,7 +144,7 @@ def format_tool_help(tool_name: str) -> str:
                     f"🔍 {tool['command']} - {details['description']} ({cat_label})\n\n"
                 )
                 message += f"**Description:** {details['description']}\n"
-                message += f"**Usage:** `{details['usage']}`\n"
+                message += f"**Commands:**\n  {details['usage']}\n\n"
                 message += f"**Example:**\n```\n{details['example']}\n```"
                 return message
 
