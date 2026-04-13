@@ -57,8 +57,10 @@
 	let expandedThinking: Record<string, boolean> = $state({});
 	let showSlashMenu = $state(false);
 	let slashMenuPosition = $state({ top: 0, left: 0 });
-	let filteredTools = $state<ToolItem[]>([]);
 	let selectedIndex = $state(0);
+
+	// Use $derived for filteredTools
+	let filteredTools = $derived(messageInput.startsWith('/') ? TOOLS.flatMap(t => t.tools).filter(tool => tool.name.toLowerCase().startsWith(messageInput.slice(1).toLowerCase()) || tool.command.toLowerCase().startsWith(messageInput.slice(1).toLowerCase())) : []);
 
 	function handleSend() {
 		if (!messageInput.trim()) return;
@@ -95,18 +97,15 @@
 		messageInput = value;
 
 		if (value.startsWith('/')) {
-			const query = value.slice(1).toLowerCase();
-			filteredTools = TOOLS.flatMap(t => t.tools).filter(tool =>
-				tool.name.toLowerCase().startsWith(query) ||
-				tool.command.toLowerCase().startsWith(query)
-			);
 			selectedIndex = 0;
 			showSlashMenu = filteredTools.length > 0;
 
 			if (showSlashMenu) {
+				// Position menu above the textarea
 				const rect = target.getBoundingClientRect();
+				const menuHeight = 300;
 				slashMenuPosition = {
-					top: rect.top - 10,
+					top: Math.max(10, rect.top - menuHeight),
 					left: rect.left
 				};
 			}
@@ -330,7 +329,7 @@
 				</div>
 			{/if}
 			<textarea
-				bind:value={messageInput}
+				value={messageInput}
 				oninput={handleInput}
 				onkeydown={handleKeydown}
 				placeholder="Describe your trading strategy... (or type / for commands)"

@@ -114,6 +114,19 @@ TOOL_REGISTRY = {
 }
 
 
+# Skill emojis mapping
+SKILL_EMOJIS = {
+    "backtest": "📊",
+    "simulate": "🎮",
+    "strategy": "📝",
+    "search": "🔍",
+    "trending": "📈",
+    "risk": "📉",
+    "token": "🪙",
+    "price": "💰",
+}
+
+
 def get_tool_registry() -> Dict[str, Any]:
     """Return the tool registry for slash command help."""
     return TOOL_REGISTRY
@@ -125,7 +138,7 @@ def format_tools_list() -> str:
 
     for category in ["randebu", "ave"]:
         tools = TOOL_REGISTRY.get(category, [])
-        if category == "randebu":
+        if category == "randedu":
             message += "🤖 Randebu Built-in:\n"
         else:
             message += "☁️ AVE Cloud Skills:\n"
@@ -138,6 +151,12 @@ def format_tools_list() -> str:
         message.rstrip() + "\n\nType /<tool-name> for detailed help on a specific tool."
     )
     return message
+
+
+def format_skill_acknowledgment(tool_name: str, description: str) -> str:
+    """Format a brief acknowledgment when a skill is activated."""
+    emoji = SKILL_EMOJIS.get(tool_name.lower(), "✨")
+    return f"{emoji} **{tool_name}** loaded. Ready for *{description}*, ask me away!"
 
 
 def format_tool_help(tool_name: str) -> str:
@@ -209,7 +228,7 @@ Your response must be valid JSON with exactly this structure:
     "actions": [{"type": "buy" | "sell" | "hold", "amount_percent": number, ...}],
     "risk_management": {"stop_loss_percent": number, "take_profit_percent": number}
   }
-}
+}"
 
 Guidelines:
 - "thinking" should be detailed reasoning about the user's request
@@ -340,6 +359,28 @@ TOOLS = [
     {
         "type": "function",
         "function": {
+            "name": "get_trending",
+            "description": "Get trending tokens on a blockchain. Use when user asks what's trending, top tokens, or popular tokens right now.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "chain": {
+                        "type": "string",
+                        "description": "Blockchain chain (default: bsc)",
+                        "default": "bsc",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of trending tokens to return (default: 10, max: 50)",
+                        "default": 10,
+                    },
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_backtest",
             "description": "Run a backtest to evaluate how the current trading strategy would have performed historically. Returns key metrics like ROI, win rate, max drawdown, etc. Use this when user asks to backtest, test strategy, or check historical performance.",
             "parameters": {
@@ -405,6 +446,7 @@ You have access to tools:
 - get_token(address, chain): Get detailed information about a specific token. Use when user asks for token details.
 - get_price(token_ids): Get current price(s) for tokens. Use when user asks for token price.
 - get_risk(address, chain): Get risk analysis for a token. Use when user asks about token safety or honeypot analysis.
+- get_trending(chain, limit): Get trending tokens on a blockchain. Use when user asks what's trending, top tokens, or popular tokens.
 - run_backtest(token_address, timeframe, start_date, end_date): Run a backtest on historical data. Returns performance metrics. Use when user asks to backtest or check historical performance.
 - manage_simulation(action, token_address, kline_interval): Manage trading simulations. Actions: 'start' (begin new), 'stop' (stop running), 'status' (check if running), 'results' (get current/latest results).
 
@@ -455,9 +497,31 @@ class ConversationalAgent:
                 "success": True,
             }
         elif cmd.startswith("/"):
-            tool_name = cmd[1:]
+            # Check if it's a known skill (only look at first word after /)
+            parts = cmd[1:].split()
+            tool_name = parts[0].lower() if parts else ""
+            has_args = len(parts) > 1
+
+            for category in ["randebu", "ave"]:
+                for tool in TOOL_REGISTRY.get(category, []):
+                    if tool["name"].lower() == tool_name:
+                        # If no additional arguments, return skill acknowledgment
+                        # If has arguments, return None to let AI handle it
+                        if not has_args:
+                            return {
+                                "response": format_skill_acknowledgment(
+                                    tool["name"], tool["description"]
+                                ),
+                                "thinking": None,
+                                "strategy_updated": False,
+                                "strategy_needs_confirmation": False,
+                                "success": True,
+                            }
+                        return None  # Has args - let AI handle it
+
+            # Unknown skill
             return {
-                "response": format_tool_help(tool_name),
+                "response": f"Unknown command '{tool_name}'. Type / to see available tools.",
                 "thinking": None,
                 "strategy_updated": False,
                 "strategy_needs_confirmation": False,
@@ -487,7 +551,10 @@ class ConversationalAgent:
         try:
             # Handle slash commands
             if user_message.startswith("/"):
-                return self._handle_slash_command(user_message)
+                result = self._handle_slash_command(user_message)
+                # If None returned, it means a skill was recognized but has args - let AI handle it
+                if result is not None:
+                    return result
 
             # Build messages array with system prompt and conversation history
             messages = [{"role": "system", "content": SYSTEM_PROMPT_WITH_TOOLS}]
@@ -518,11 +585,11 @@ class ConversationalAgent:
                 },
             )
 
-            result = resp.json()
+            result = resp.json() or {}
 
             # Extract thinking from reasoning_content
             thinking = None
-            if "choices" in result and len(result["choices"]) > 0:
+            if result.get("choices") and len(result.get("choices", [])) > 0:
                 choice = result["choices"][0]
                 if "message" in choice:
                     message = choice["message"]
@@ -554,7 +621,12 @@ class ConversationalAgent:
                                 if code == 0:
                                     try:
                                         data = json.loads(output)
-                                        tokens = data.get("data", {}).get("tokens", [])
+                                        # Handle both dict with 'tokens' key and direct list
+                                        data_field = data.get("data", [])
+                                        if isinstance(data_field, list):
+                                            tokens = data_field
+                                        else:
+                                            tokens = data_field.get("tokens", [])
                                         if tokens:
                                             token_list = ""
                                             for t in tokens[:limit]:
@@ -565,7 +637,11 @@ class ConversationalAgent:
                                                     "token_price_change_24h", "N/A"
                                                 )
                                                 mc = t.get("market_cap", "N/A")
-                                                token_list += f"- **{symbol}** ({name}): `{addr}` - MC: ${mc:,.0f} - 24h: {price_change}%\n"
+                                                try:
+                                                    mc_str = f"${float(mc):,.0f}"
+                                                except (ValueError, TypeError):
+                                                    mc_str = str(mc)
+                                                token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
                                             response_text = f"Here are the search results for '{keyword}' on BSC:\n\n{token_list}\nWould you like me to set up a strategy for any of these?"
                                         else:
                                             response_text = f"No tokens found for '{keyword}'. Try a different keyword."
@@ -594,24 +670,51 @@ class ConversationalAgent:
                                 if code == 0:
                                     try:
                                         data = json.loads(output)
-                                        token_data = data.get("data", {})
-                                        if token_data:
-                                            symbol = token_data.get("symbol", "N/A")
-                                            name = token_data.get("name", "N/A")
-                                            price = token_data.get("price", "N/A")
-                                            mc = token_data.get("market_cap", "N/A")
-                                            vol = token_data.get("volume_24h", "N/A")
-                                            pairs = token_data.get("top_pairs", [])
+                                        data_field = data.get("data")
+                                        # Handle both dict and list responses
+                                        token_data = data_field if isinstance(data_field, dict) else {}
+                                        # Token details may be nested in 'token' key
+                                        token_info = token_data.get("token", token_data)
+                                        # Check if token has valid symbol/name (not None, not 'N/A')
+                                        symbol = token_info.get("symbol") or token_data.get("symbol")
+                                        name = token_info.get("name") or token_data.get("name")
+                                        if not symbol or symbol == "N/A" or not name or name == "N/A":
+                                            response_text = f"Token not found for {address}. Raw response: {output[:500]}"
+                                        else:
+                                            # Try different price field names
+                                            price = (token_info.get("current_price_usd") 
+                                                     or token_info.get("price_usd") 
+                                                     or token_info.get("price") 
+                                                     or token_data.get("price") 
+                                                     or "N/A")
+                                            mc = (token_info.get("market_cap") 
+                                                  or token_info.get("fdv") 
+                                                  or token_data.get("market_cap") 
+                                                  or "N/A")
+                                            vol = (token_info.get("tx_volume_u_24h") 
+                                                   or token_info.get("volume_24h") 
+                                                   or token_data.get("volume_24h") 
+                                                   or "N/A")
+                                            pairs = token_info.get("top_pairs") or token_data.get("top_pairs") or []
                                             pairs_text = ""
                                             if pairs:
                                                 pairs_text = "\n**Top Pairs:**\n"
                                                 for p in pairs[:3]:
-                                                    pairs_text += f"- {p.get('pair', 'N/A')}: ${p.get('liquidity', 'N/A'):,.0f} liquidity\n"
-                                            response_text = f"**{symbol}** ({name})\n\nPrice: ${price}\nMarket Cap: ${mc:,.0f}\n24h Volume: ${vol:,.0f}{pairs_text}"
-                                        else:
-                                            response_text = (
-                                                f"Token not found: {address}"
-                                            )
+                                                    liq = p.get('liquidity', 'N/A')
+                                                    try:
+                                                        liq_str = f"${float(liq):,.0f}"
+                                                    except (ValueError, TypeError):
+                                                        liq_str = str(liq)
+                                                    pairs_text += f"- {p.get('pair', 'N/A')}: {liq_str} liquidity\n"
+                                            try:
+                                                mc_str = f"${float(mc):,.0f}" if mc != "N/A" else "N/A"
+                                            except (ValueError, TypeError):
+                                                mc_str = str(mc)
+                                            try:
+                                                vol_str = f"${float(vol):,.0f}" if vol != "N/A" else "N/A"
+                                            except (ValueError, TypeError):
+                                                vol_str = str(vol)
+                                            response_text = f"**{symbol}** ({name})\n\nPrice: ${price}\nMarket Cap: {mc_str}\n24h Volume: {vol_str}{pairs_text}"
                                     except json.JSONDecodeError:
                                         response_text = "Failed to parse token data."
                                 else:
@@ -641,6 +744,9 @@ class ConversationalAgent:
                                         try:
                                             data = json.loads(output)
                                             prices = data.get("data", {})
+                                            # Ensure prices is a dict
+                                            if not isinstance(prices, dict):
+                                                prices = {}
                                             if prices:
                                                 price_text = "**Token Prices:**\n"
                                                 for (
@@ -686,27 +792,53 @@ class ConversationalAgent:
                                 if code == 0:
                                     try:
                                         data = json.loads(output)
-                                        risk_data = data.get("data", {})
+                                        data_field = data.get("data")
+                                        # Handle both dict and list responses
+                                        risk_data = data_field if isinstance(data_field, dict) else {}
                                         if risk_data:
                                             is_honeypot = risk_data.get(
                                                 "is_honeypot", "unknown"
                                             )
-                                            buy_tax = risk_data.get("buy_tax", "N/A")
-                                            sell_tax = risk_data.get("sell_tax", "N/A")
+                                            buy_tax = risk_data.get("buy_tax", 0)
+                                            sell_tax = risk_data.get("sell_tax", 0)
                                             status = risk_data.get("status", "unknown")
+                                            # Convert is_honeypot to string for comparison
+                                            if isinstance(is_honeypot, bool):
+                                                is_honeypot_str = str(is_honeypot).lower()
+                                            elif isinstance(is_honeypot, int):
+                                                if is_honeypot == 1:
+                                                    is_honeypot_str = "true"
+                                                elif is_honeypot == 0:
+                                                    is_honeypot_str = "false"
+                                                else:
+                                                    is_honeypot_str = "unknown"  # -1 or other means couldn't determine
+                                            else:
+                                                is_honeypot_str = str(is_honeypot).lower() if is_honeypot else "unknown"
+                                            
+                                            # Format honeypot display value
+                                            if is_honeypot_str == "unknown":
+                                                honeypot_display = "Unknown (could not determine)"
+                                            else:
+                                                honeypot_display = is_honeypot_str
+                                            # Convert tax values to float for comparison
+                                            try:
+                                                buy_tax_val = float(buy_tax) if buy_tax not in (None, "N/A") else 0
+                                            except (ValueError, TypeError):
+                                                buy_tax_val = 0
+                                            try:
+                                                sell_tax_val = float(sell_tax) if sell_tax not in (None, "N/A") else 0
+                                            except (ValueError, TypeError):
+                                                sell_tax_val = 0
                                             risk_text = (
                                                 f"**Risk Analysis for {address}**\n\n"
                                             )
                                             risk_text += f"- Status: {status}\n"
-                                            risk_text += f"- Honeypot: {is_honeypot}\n"
+                                            risk_text += f"- Honeypot: {honeypot_display}\n"
                                             risk_text += f"- Buy Tax: {buy_tax}%\n"
                                             risk_text += f"- Sell Tax: {sell_tax}%\n"
-                                            if is_honeypot.lower() == "true":
+                                            if is_honeypot_str == "true":
                                                 risk_text += "\n⚠️ **Warning: This token appears to be a honeypot. Do not buy!**"
-                                            elif (
-                                                float(buy_tax or 0) > 10
-                                                or float(sell_tax or 0) > 10
-                                            ):
+                                            elif buy_tax_val > 10 or sell_tax_val > 10:
                                                 risk_text += "\n⚠️ **Warning: High tax detected. Trade with caution!**"
                                             else:
                                                 risk_text += "\n✅ This token appears safe to trade."
@@ -719,6 +851,49 @@ class ConversationalAgent:
                                         response_text = "Failed to parse risk data."
                                 else:
                                     response_text = f"Failed to get risk data: {output}"
+
+                                return {
+                                    "response": response_text,
+                                    "thinking": thinking,
+                                    "strategy_updated": False,
+                                    "strategy_needs_confirmation": False,
+                                    "success": True,
+                                }
+
+                            elif func_name == "get_trending":
+                                chain = args.get("chain", "bsc")
+                                limit = args.get("limit", 10)
+
+                                code, output = self._call_ave_script(
+                                    "trending",
+                                    ["--chain", chain, "--page-size", str(min(limit, 50))],
+                                )
+                                if code == 0:
+                                    try:
+                                        data = json.loads(output)
+                                        data_field = data.get("data")
+                                        # Handle both dict and list responses
+                                        tokens = data_field if isinstance(data_field, list) else data_field.get("tokens", [])
+                                        if tokens:
+                                            token_list = ""
+                                            for t in tokens[:limit]:
+                                                addr = t.get("token", "")
+                                                symbol = t.get("symbol", "")
+                                                name = t.get("name", "")
+                                                price_change = t.get("token_price_change_24h", "N/A")
+                                                mc = t.get("market_cap", "N/A")
+                                                try:
+                                                    mc_str = f"${float(mc):,.0f}"
+                                                except (ValueError, TypeError):
+                                                    mc_str = str(mc)
+                                                token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
+                                            response_text = f"🔥 Trending tokens on {chain.upper()}:\n\n{token_list}\nWould you like me to set up a strategy for any of these?"
+                                        else:
+                                            response_text = f"No trending tokens found on {chain.upper()}."
+                                    except json.JSONDecodeError:
+                                        response_text = "Failed to parse trending data."
+                                else:
+                                    response_text = f"Failed to get trending tokens: {output}"
 
                                 return {
                                     "response": response_text,
@@ -823,7 +998,12 @@ class ConversationalAgent:
                         if code == 0:
                             try:
                                 data = json.loads(output)
-                                tokens = data.get("data", {}).get("tokens", [])
+                                # Handle both dict with 'tokens' key and direct list
+                                data_field = data.get("data", [])
+                                if isinstance(data_field, list):
+                                    tokens = data_field
+                                else:
+                                    tokens = data_field.get("tokens", [])
                                 if tokens:
                                     token_list = ""
                                     for t in tokens[:limit]:
@@ -834,7 +1014,11 @@ class ConversationalAgent:
                                             "token_price_change_24h", "N/A"
                                         )
                                         mc = t.get("market_cap", "N/A")
-                                        token_list += f"- **{symbol}** ({name}): `{addr}` - MC: ${mc:,.0f} - 24h: {price_change}%\n"
+                                        try:
+                                            mc_str = f"${float(mc):,.0f}"
+                                        except (ValueError, TypeError):
+                                            mc_str = str(mc)
+                                        token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
                                     response_text = f"Here are the search results for '{keyword}' on BSC:\n\n{token_list}\nWould you like me to set up a strategy for any of these?"
                                 else:
                                     response_text = f"No tokens found for '{keyword}'. Try a different keyword."
@@ -858,7 +1042,7 @@ class ConversationalAgent:
             if strategy_update:
                 # Extract token name from conditions
                 token_name = None
-                for cond in strategy_update.get("conditions", []):
+                for cond in (strategy_update.get("conditions") or []):
                     if not cond.get("token_address") and cond.get("token"):
                         token_name = cond.get("token")
                         strategy_needs_confirmation = True
@@ -873,7 +1057,12 @@ class ConversationalAgent:
                         )
                         if code == 0:
                             data = json.loads(output)
-                            tokens = data.get("data", {}).get("tokens", [])
+                            # Handle both dict with 'tokens' key and direct list
+                            data_field = data.get("data", [])
+                            if isinstance(data_field, list):
+                                tokens = data_field
+                            else:
+                                tokens = data_field.get("tokens", [])
                             if tokens:
                                 token_search_results = [
                                     {
@@ -1296,7 +1485,7 @@ Would you like me to adjust the strategy parameters based on these results?"""
 
         settings = get_settings()
         repo_root = os.path.dirname(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
         )
         ave_skill_path = os.path.join(
             repo_root, "ave-cloud-skill", "scripts", "ave_data_rest.py"
@@ -1315,7 +1504,11 @@ Would you like me to adjust the strategy parameters based on these results?"""
                 env=env,
                 timeout=30,
             )
-            return result.returncode, result.stdout
+            # Include stderr in output for debugging
+            output = result.stdout
+            if result.returncode != 0 and result.stderr:
+                output = f"{output}\n{result.stderr}".strip()
+            return result.returncode, output
         except subprocess.TimeoutExpired:
             return 1, "Error: Command timed out"
         except Exception as e:
