@@ -18,6 +18,169 @@ from ...core.config import get_settings
 from ...db.models import Bot, Simulation
 
 
+TOOL_REGISTRY = {
+    "randebu": [
+        {
+            "name": "backtest",
+            "description": "Run strategy backtest",
+            "category": "Randebu Built-in",
+            "command": "/backtest",
+            "details": {
+                "description": "Run a backtest to evaluate how the current trading strategy would have performed historically.",
+                "usage": "/backtest [token_address] [--timeframe 1d|4h|1h|15m] [--start YYYY-MM-DD] [--end YYYY-MM-DD]",
+                "example": "Run a backtest on PEPE for the last 30 days",
+            },
+        },
+        {
+            "name": "simulate",
+            "description": "Start/stop simulation",
+            "category": "Randebu Built-in",
+            "command": "/simulate",
+            "details": {
+                "description": "Start or stop trading simulations that run on real-time klines.",
+                "usage": "/simulate start|stop|status|results [token_address]",
+                "example": "Start a simulation on PEPE",
+            },
+        },
+        {
+            "name": "strategy",
+            "description": "View/update strategy",
+            "category": "Randebu Built-in",
+            "command": "/strategy",
+            "details": {
+                "description": "View your current trading strategy or update it with new parameters.",
+                "usage": "Describe your strategy in plain English, e.g., 'Buy PEPE when price drops 5%'",
+                "example": "Buy PEPE when it drops 10% within 1 hour",
+            },
+        },
+    ],
+    "ave": [
+        {
+            "name": "search",
+            "description": "Token search",
+            "category": "AVE Cloud Skills",
+            "command": "/search",
+            "details": {
+                "description": "Find tokens by keyword, symbol, or contract address on BSC.",
+                "usage": "search <keyword> [--chain bsc] [--limit 20]",
+                "example": "search PEPE\nsearch 0x1234... --chain bsc",
+            },
+        },
+        {
+            "name": "risk",
+            "description": "Honeypot detection",
+            "category": "AVE Cloud Skills",
+            "command": "/risk",
+            "details": {
+                "description": "Get risk analysis for a token contract including honeypot assessment.",
+                "usage": "risk <token_address> [--chain bsc]",
+                "example": "risk 0x6982508145454Ce125dDE157d8d64a26D53f60a2",
+            },
+        },
+        {
+            "name": "token",
+            "description": "Token details",
+            "category": "AVE Cloud Skills",
+            "command": "/token",
+            "details": {
+                "description": "Get detailed information about a specific token including price, market cap, and pairs.",
+                "usage": "token <address> [--chain bsc]",
+                "example": "token 0x6982508145454Ce125dDE157d8d64a26D53f60a2",
+            },
+        },
+        {
+            "name": "price",
+            "description": "Batch prices",
+            "category": "AVE Cloud Skills",
+            "command": "/price",
+            "details": {
+                "description": "Get current price(s) for multiple tokens.",
+                "usage": "price <token_id>,<token_id>,... (e.g., PEPE-bsc,TRUMP-bsc)",
+                "example": "price PEPE-bsc,TRUMP-bsc",
+            },
+        },
+    ],
+}
+
+
+def get_tool_registry() -> Dict[str, Any]:
+    """Return the tool registry for slash command help."""
+    return TOOL_REGISTRY
+
+
+def format_tools_list() -> str:
+    """Format the tool registry as a help message."""
+    message = "📋 Available Tools\n\n"
+
+    for category in ["randebu", "ave"]:
+        tools = TOOL_REGISTRY.get(category, [])
+        if category == "randebu":
+            message += "🤖 Randebu Built-in:\n"
+        else:
+            message += "☁️ AVE Cloud Skills:\n"
+
+        for tool in tools:
+            message += f"  • {tool['command']} - {tool['description']}\n"
+        message += "\n"
+
+    message = (
+        message.rstrip() + "\n\nType /<tool-name> for detailed help on a specific tool."
+    )
+    return message
+
+
+def format_tool_help(tool_name: str) -> str:
+    """Format detailed help for a specific tool."""
+    tool_name = tool_name.lstrip("/")
+
+    for category in ["randebu", "ave"]:
+        for tool in TOOL_REGISTRY.get(category, []):
+            if tool["name"].lower() == tool_name.lower():
+                cat_label = (
+                    "Randebu Built-in" if category == "randebu" else "AVE Cloud Skill"
+                )
+                details = tool["details"]
+                message = (
+                    f"🔍 {tool['command']} - {details['description']} ({cat_label})\n\n"
+                )
+                message += f"**Description:** {details['description']}\n"
+                message += f"**Usage:** `{details['usage']}`\n"
+                message += f"**Example:**\n```\n{details['example']}\n```"
+                return message
+
+    return f"Tool '{tool_name}' not found. Type / to see all available tools."
+
+
+def format_general_help() -> str:
+    """Format general help about Randebu."""
+    return """🤖 **Randebu - AI Trading Assistant**
+
+Randebu is your AI trading assistant that helps you manage your trading bots on BSC (Binance Smart Chain).
+
+**Getting Started:**
+1. Create a bot on the dashboard
+2. Describe your trading strategy in plain English
+3. Run backtests to validate your strategy
+4. Start simulations to see live trading
+
+**Example Strategies:**
+- "Buy PEPE when it drops 5%"
+- "Sell if price rises 10% within 1 hour"
+- "Buy when volume spikes by 200%"
+
+**Slash Commands:**
+- `/` - Show all available tools
+- `/help` - Show this help message
+- `/<tool-name>` - Get help on a specific tool
+
+**Natural Language:**
+You can also just describe what you want in natural language. For example:
+- "What's the price of PEPE?"
+- "Run a backtest on 0x... token"
+- "Start a simulation on TRUMP"
+"""
+
+
 SYSTEM_PROMPT = """You are a helpful AI trading assistant named Randebu. You help users manage their trading bots.
 
 IMPORTANT CHAIN LIMITATION:
@@ -253,6 +416,51 @@ class ConversationalAgent:
         # Extended thinking endpoint
         self.thinking_endpoint = "https://api.minimax.io/v1/text/chatcompletion_v2"
 
+    def _handle_slash_command(self, user_message: str) -> Dict[str, Any]:
+        """Handle slash command help requests.
+
+        Args:
+            user_message: The slash command message (e.g., '/', '/help', '/search')
+
+        Returns:
+            Dict with 'response', 'thinking', and other fields
+        """
+        cmd = user_message.strip().lower()
+
+        if cmd == "/":
+            return {
+                "response": format_tools_list(),
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+        elif cmd == "/help":
+            return {
+                "response": format_general_help(),
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+        elif cmd.startswith("/"):
+            tool_name = cmd[1:]
+            return {
+                "response": format_tool_help(tool_name),
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+
+        return {
+            "response": "Unknown command. Type / for available tools or /help for general help.",
+            "thinking": None,
+            "strategy_updated": False,
+            "strategy_needs_confirmation": False,
+            "success": True,
+        }
+
     def chat(
         self, user_message: str, conversation_history: List[Dict] = None
     ) -> Dict[str, Any]:
@@ -266,6 +474,10 @@ class ConversationalAgent:
             Dict with 'response', 'thinking', and 'strategy_updated'
         """
         try:
+            # Handle slash commands
+            if user_message.startswith("/"):
+                return self._handle_slash_command(user_message)
+
             # Build messages array with system prompt and conversation history
             messages = [{"role": "system", "content": SYSTEM_PROMPT_WITH_TOOLS}]
 
