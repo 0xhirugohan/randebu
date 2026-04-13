@@ -505,6 +505,9 @@ class ConversationalAgent:
             for category in ["randebu", "ave"]:
                 for tool in TOOL_REGISTRY.get(category, []):
                     if tool["name"].lower() == tool_name:
+                        # Special handling for /strategy - fetch current strategy from DB
+                        if tool_name == "strategy" and not has_args:
+                            return self._get_strategy_response()
                         # If no additional arguments, return skill acknowledgment
                         # If has arguments, return None to let AI handle it
                         if not has_args:
@@ -535,6 +538,110 @@ class ConversationalAgent:
             "strategy_needs_confirmation": False,
             "success": True,
         }
+
+    def _get_strategy_response(self) -> Dict[str, Any]:
+        """Fetch and format the current strategy from the database."""
+        if not self.bot_id:
+            return {
+                "response": "No bot selected. Please select a bot first.",
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+
+        try:
+            from ...core.database import get_db
+            db = next(get_db())
+            try:
+                bot = db.query(Bot).filter(Bot.id == self.bot_id).first()
+                if not bot:
+                    return {
+                        "response": "Bot not found.",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+
+                strategy_config = bot.strategy_config
+                if not strategy_config:
+                    return {
+                        "response": "📝 **Your Current Strategy**\n\nNo strategy has been configured yet. Tell me what trading strategy you'd like to use, and I'll set it up for you!\n\nExample: \"Buy PEPE when it drops 5%\"",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+
+                # Format the strategy nicely
+                conditions = strategy_config.get("conditions", [])
+                actions = strategy_config.get("actions", [])
+                risk = strategy_config.get("risk_management", {})
+
+                response = "📝 **Your Current Strategy**\n\n"
+
+                # Format conditions
+                if conditions:
+                    response += "**Conditions:**\n"
+                    for cond in conditions:
+                        cond_type = cond.get("type", "unknown")
+                        token = cond.get("token", "")
+                        threshold = cond.get("threshold", 0)
+                        timeframe = cond.get("timeframe", "")
+                        if cond_type == "price_drop":
+                            response += f"- Buy when {token} drops {threshold}%"
+                        elif cond_type == "price_rise":
+                            response += f"- Sell when {token} rises {threshold}%"
+                        elif cond_type == "volume_spike":
+                            response += f"- Buy when volume spikes {threshold}%"
+                        elif cond_type == "price_level":
+                            response += f"- Buy/sell at price level {threshold}"
+                        else:
+                            response += f"- {cond_type}: {token} {threshold}"
+                        if timeframe:
+                            response += f" within {timeframe}"
+                        response += "\n"
+                    response += "\n"
+
+                # Format actions
+                if actions:
+                    response += "**Actions:**\n"
+                    for action in actions:
+                        action_type = action.get("type", "unknown")
+                        amount = action.get("amount_percent", 0)
+                        response += f"- {action_type.capitalize()} {amount}% of balance\n"
+                    response += "\n"
+
+                # Format risk management
+                if risk:
+                    response += "**Risk Management:**\n"
+                    stop_loss = risk.get("stop_loss_percent", 0)
+                    take_profit = risk.get("take_profit_percent", 0)
+                    if stop_loss:
+                        response += f"- Stop loss: {stop_loss}%\n"
+                    if take_profit:
+                        response += f"- Take profit: {take_profit}%\n"
+
+                response += "\nWould you like to modify this strategy?"
+
+                return {
+                    "response": response,
+                    "thinking": None,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": False,
+                    "success": True,
+                }
+            finally:
+                db.close()
+        except Exception as e:
+            return {
+                "response": f"Error fetching strategy: {str(e)}",
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
 
     def chat(
         self, user_message: str, conversation_history: List[Dict] = None
