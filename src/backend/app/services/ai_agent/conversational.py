@@ -514,6 +514,12 @@ class ConversationalAgent:
                         # Special handling for /trending - execute trending directly
                         if tool_name == "trending" and not has_args:
                             return self._execute_trending()
+                        # Special handling for /backtest - execute directly
+                        if tool_name == "backtest" and not has_args:
+                            return self._execute_backtest_direct()
+                        # Special handling for /simulate - execute directly
+                        if tool_name == "simulate" and not has_args:
+                            return self._execute_simulate_direct()
                         # For commands that need params (/search, /risk, /token, /price)
                         # execute immediately if args provided, otherwise set pending
                         if not has_args:
@@ -1018,6 +1024,138 @@ class ConversationalAgent:
                 "success": True,
             }
 
+    def _execute_backtest_direct(self, message: str) -> Dict[str, Any]:
+        """Execute backtest directly using token from strategy or message."""
+        # Extract token address from message if provided
+        parts = message.split()
+        token_address = None
+        timeframe = "1d"
+        start_date = None
+        end_date = None
+
+        # Parse arguments from message
+        for i, part in enumerate(parts[1:], 1):  # Skip /backtest
+            if part.startswith("0x") and len(part) > 20:
+                token_address = part
+            elif part in ["1d", "4h", "1h", "15m"]:
+                timeframe = part
+            elif part.startswith("20") and len(part) == 10:
+                if not start_date:
+                    start_date = part
+                else:
+                    end_date = part
+
+        # If no token address in message, try to get from strategy
+        if not token_address and self.bot_id:
+            try:
+                from ...core.database import get_db
+                db = next(get_db())
+                try:
+                    bot = db.query(Bot).filter(Bot.id == self.bot_id).first()
+                    if bot and bot.strategy_config:
+                        conditions = bot.strategy_config.get("conditions", [])
+                        for cond in conditions:
+                            addr = cond.get("token_address")
+                            if addr:
+                                token_address = addr
+                                break
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
+        if not token_address:
+            return {
+                "response": "📊 **Backtest**\n\nI need a token address to run a backtest. Please provide:\n- Token contract address (e.g., `0x...`)\n- Timeframe (1d, 4h, 1h, 15m) - default is 1d\n- Start and end dates (YYYY-MM-DD) - optional, defaults to last 30 days",
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+
+        # Execute backtest
+        result = self._execute_backtest(
+            token_address=token_address,
+            timeframe=timeframe,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return {
+            "response": result,
+            "thinking": None,
+            "strategy_updated": False,
+            "strategy_needs_confirmation": False,
+            "success": True,
+        }
+
+    def _execute_simulate_direct(self, message: str) -> Dict[str, Any]:
+        """Execute simulate directly using token from strategy or message."""
+        # Extract parameters from message
+        parts = message.split()
+        action = None
+        token_address = None
+        kline_interval = "1m"
+
+        # Parse arguments from message
+        for i, part in enumerate(parts[1:], 1):  # Skip /simulate
+            if part in ["start", "stop", "status", "results"]:
+                action = part
+            elif part.startswith("0x") and len(part) > 20:
+                token_address = part
+            elif part in ["1m", "5m", "15m", "1h", "4h"]:
+                kline_interval = part
+
+        # If no token in message and action is start, try to get from strategy
+        if not token_address and self.bot_id and action == "start":
+            try:
+                from ...core.database import get_db
+                db = next(get_db())
+                try:
+                    bot = db.query(Bot).filter(Bot.id == self.bot_id).first()
+                    if bot and bot.strategy_config:
+                        conditions = bot.strategy_config.get("conditions", [])
+                        for cond in conditions:
+                            addr = cond.get("token_address")
+                            if addr:
+                                token_address = addr
+                                break
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
+        if action == "start" and not token_address:
+            return {
+                "response": "🎮 **Simulation**\n\nI need a token address to start a simulation. Please provide:\n- Token contract address (e.g., `0x...`)\n- Kline interval (1m, 5m, 15m, 1h, 4h) - default is 1m",
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+
+        if not action:
+            return {
+                "response": "🎮 **Simulation**\n\nPlease specify an action:\n- `/simulate start [token_address]` - Start new simulation\n- `/simulate stop` - Stop running simulation\n- `/simulate status` - Check simulation status\n- `/simulate results` - Get simulation results",
+                "thinking": None,
+                "strategy_updated": False,
+                "strategy_needs_confirmation": False,
+                "success": True,
+            }
+
+        # Execute simulation
+        result = self._manage_simulation(
+            action=action,
+            token_address=token_address,
+            kline_interval=kline_interval,
+        )
+        return {
+            "response": result,
+            "thinking": None,
+            "strategy_updated": False,
+            "strategy_needs_confirmation": False,
+            "success": True,
+        }
+
     def chat(
         self, user_message: str, conversation_history: List[Dict] = None
     ) -> Dict[str, Any]:
@@ -1052,6 +1190,12 @@ class ConversationalAgent:
                     return self._execute_token(user_message)
                 elif pending == "price":
                     return self._execute_price(user_message)
+
+            # Check for backtest/simulate with args in message
+            if user_message.startswith("/backtest"):
+                return self._execute_backtest_direct(user_message)
+            elif user_message.startswith("/simulate"):
+                return self._execute_simulate_direct(user_message)
 
             # Build messages array with system prompt and conversation history
             messages = [{"role": "system", "content": SYSTEM_PROMPT_WITH_TOOLS}]
