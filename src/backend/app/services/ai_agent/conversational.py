@@ -879,6 +879,28 @@ class ConversationalAgent:
                 "success": True,
             }
 
+    def _get_token_info(self, address: str) -> Dict[str, str]:
+        """Get basic token info (symbol, name) without formatting for display."""
+        try:
+            code, output = self._call_ave_script(
+                "token",
+                ["--address", address.strip(), "--chain", "bsc"],
+            )
+            if code == 0:
+                try:
+                    data = json.loads(output)
+                    data_field = data.get("data")
+                    token_data = data_field if isinstance(data_field, dict) else {}
+                    token_info = token_data.get("token", token_data)
+                    symbol = token_info.get("symbol") or token_data.get("symbol")
+                    name = token_info.get("name") or token_data.get("name")
+                    return {"symbol": symbol or "", "name": name or ""}
+                except (json.JSONDecodeError, AttributeError):
+                    return {"symbol": "", "name": ""}
+            return {"symbol": "", "name": ""}
+        except Exception:
+            return {"symbol": "", "name": ""}
+
     def _execute_token(self, address: str) -> Dict[str, Any]:
         """Execute token details for the given address."""
         try:
@@ -1073,6 +1095,12 @@ class ConversationalAgent:
                 "success": True,
             }
 
+        # Look up token details first
+        token_info = self._get_token_info(token_address)
+        token_label = f"`{token_address}`"
+        if token_info.get("symbol"):
+            token_label = f"**{token_info['symbol']}** ({token_info.get('name', 'Unknown')}) - `{token_address}`"
+
         # Execute backtest
         result = self._execute_backtest(
             token_address=token_address,
@@ -1080,8 +1108,9 @@ class ConversationalAgent:
             start_date=start_date,
             end_date=end_date,
         )
+        # Prepend token info to backtest result
         return {
-            "response": result,
+            "response": f"📊 **Backtest for {token_label}**\n\n{result}",
             "thinking": None,
             "strategy_updated": False,
             "strategy_needs_confirmation": False,
