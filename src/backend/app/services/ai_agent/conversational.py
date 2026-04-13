@@ -515,11 +515,11 @@ class ConversationalAgent:
                         if tool_name == "trending" and not has_args:
                             return self._execute_trending()
                         # Special handling for /backtest - execute directly
-                        if tool_name == "backtest" and not has_args:
-                            return self._execute_backtest_direct()
+                        if tool_name == "backtest":
+                            return self._execute_backtest_direct(user_message if has_args else "")
                         # Special handling for /simulate - execute directly
-                        if tool_name == "simulate" and not has_args:
-                            return self._execute_simulate_direct()
+                        if tool_name == "simulate":
+                            return self._execute_simulate_direct(user_message if has_args else "")
                         # For commands that need params (/search, /risk, /token, /price)
                         # execute immediately if args provided, otherwise set pending
                         if not has_args:
