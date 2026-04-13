@@ -24,6 +24,7 @@
 			label: '☁️ AVE Cloud Skills',
 			tools: [
 				{ name: 'search', description: 'Token search', command: '/search' },
+				{ name: 'trending', description: 'Popular tokens', command: '/trending' },
 				{ name: 'risk', description: 'Honeypot detection', command: '/risk' },
 				{ name: 'token', description: 'Token details', command: '/token' },
 				{ name: 'price', description: 'Batch prices', command: '/price' },

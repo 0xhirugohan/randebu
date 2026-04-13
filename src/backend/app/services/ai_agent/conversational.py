@@ -67,6 +67,17 @@ TOOL_REGISTRY = {
             },
         },
         {
+            "name": "trending",
+            "description": "Popular tokens",
+            "category": "AVE Cloud Skills",
+            "command": "/trending",
+            "details": {
+                "description": "Get list of trending/popular tokens on BSC.",
+                "usage": "trending [--chain bsc] [--limit 20]",
+                "example": "trending --chain bsc\ntrending --limit 10",
+            },
+        },
+        {
             "name": "risk",
             "description": "Honeypot detection",
             "category": "AVE Cloud Skills",
