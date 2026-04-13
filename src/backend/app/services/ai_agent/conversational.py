@@ -472,6 +472,15 @@ class ConversationalAgent:
         # Track pending command after acknowledgment
         self.pending_command = None
 
+    def _is_error_output(self, code: int, output: str) -> bool:
+        """Check if the command output contains an error."""
+        if code != 0:
+            return True
+        # Check for common error patterns in output
+        if output.startswith("Error:") or "API error" in output or "api key invalid" in output.lower():
+            return True
+        return False
+
     def _handle_slash_command(self, user_message: str) -> Dict[str, Any]:
         """Handle slash command help requests.
 
@@ -664,54 +673,53 @@ class ConversationalAgent:
                 "trending",
                 ["--chain", "bsc", "--page-size", "10"],
             )
-            if code == 0:
-                try:
-                    data = json.loads(output)
-                    # Handle both dict with 'tokens' key and direct list
-                    data_field = data.get("data", [])
-                    if isinstance(data_field, list):
-                        tokens = data_field
-                    else:
-                        tokens = data_field.get("tokens", [])
-                    if tokens:
-                        token_list = ""
-                        for t in tokens[:10]:
-                            addr = t.get("token", "")
-                            symbol = t.get("symbol", "")
-                            name = t.get("name", "")
-                            price_change = t.get("token_price_change_24h", "N/A")
-                            mc = t.get("market_cap", "N/A")
-                            try:
-                                mc_str = f"${float(mc):,.0f}"
-                            except (ValueError, TypeError):
-                                mc_str = str(mc)
-                            token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
-                        return {
-                            "response": f"📈 **Trending Tokens on BSC:**\n\n{token_list}\nWould you like me to set up a strategy for any of these?",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                    else:
-                        return {
-                            "response": "No trending tokens found on BSC right now. Try again later!",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                except json.JSONDecodeError:
+            if self._is_error_output(code, output):
+                return {
+                    "response": f"Failed to get trending tokens: {output}",
+                    "thinking": None,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": False,
+                    "success": True,
+                }
+            try:
+                data = json.loads(output)
+                # Handle both dict with 'tokens' key and direct list
+                data_field = data.get("data", [])
+                if isinstance(data_field, list):
+                    tokens = data_field
+                else:
+                    tokens = data_field.get("tokens", [])
+                if tokens:
+                    token_list = ""
+                    for t in tokens[:10]:
+                        addr = t.get("token", "")
+                        symbol = t.get("symbol", "")
+                        name = t.get("name", "")
+                        price_change = t.get("token_price_change_24h", "N/A")
+                        mc = t.get("market_cap", "N/A")
+                        try:
+                            mc_str = f"${float(mc):,.0f}"
+                        except (ValueError, TypeError):
+                            mc_str = str(mc)
+                        token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
                     return {
-                        "response": f"Failed to parse trending data: {output[:200]}",
+                        "response": f"📈 **Trending Tokens on BSC:**\n\n{token_list}\nWould you like me to set up a strategy for any of these?",
                         "thinking": None,
                         "strategy_updated": False,
                         "strategy_needs_confirmation": False,
                         "success": True,
                     }
-            else:
+                else:
+                    return {
+                        "response": "No trending tokens found on BSC right now. Try again later!",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+            except json.JSONDecodeError:
                 return {
-                    "response": f"Failed to get trending tokens: {output}",
+                    "response": f"Failed to parse trending data: {output[:200]}",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
@@ -733,54 +741,53 @@ class ConversationalAgent:
                 "search",
                 ["--keyword", keyword.strip(), "--chain", "bsc", "--limit", "10"],
             )
-            if code == 0:
-                try:
-                    data = json.loads(output)
-                    # Handle both dict with 'tokens' key and direct list
-                    data_field = data.get("data", [])
-                    if isinstance(data_field, list):
-                        tokens = data_field
-                    else:
-                        tokens = data_field.get("tokens", [])
-                    if tokens:
-                        token_list = ""
-                        for t in tokens[:10]:
-                            addr = t.get("token", "")
-                            symbol = t.get("symbol", "")
-                            name = t.get("name", "")
-                            price_change = t.get("token_price_change_24h", "N/A")
-                            mc = t.get("market_cap", "N/A")
-                            try:
-                                mc_str = f"${float(mc):,.0f}"
-                            except (ValueError, TypeError):
-                                mc_str = str(mc)
-                            token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
-                        return {
-                            "response": f"🔍 **Search Results for '{keyword}':**\n\n{token_list}\nWould you like me to set up a strategy for any of these?",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                    else:
-                        return {
-                            "response": f"No tokens found for '{keyword}'. Try a different keyword.",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                except json.JSONDecodeError:
+            if self._is_error_output(code, output):
+                return {
+                    "response": f"Failed to search tokens: {output}",
+                    "thinking": None,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": False,
+                    "success": True,
+                }
+            try:
+                data = json.loads(output)
+                # Handle both dict with 'tokens' key and direct list
+                data_field = data.get("data", [])
+                if isinstance(data_field, list):
+                    tokens = data_field
+                else:
+                    tokens = data_field.get("tokens", [])
+                if tokens:
+                    token_list = ""
+                    for t in tokens[:10]:
+                        addr = t.get("token", "")
+                        symbol = t.get("symbol", "")
+                        name = t.get("name", "")
+                        price_change = t.get("token_price_change_24h", "N/A")
+                        mc = t.get("market_cap", "N/A")
+                        try:
+                            mc_str = f"${float(mc):,.0f}"
+                        except (ValueError, TypeError):
+                            mc_str = str(mc)
+                        token_list += f"- **{symbol}** ({name}): `{addr}` - MC: {mc_str} - 24h: {price_change}%\n"
                     return {
-                        "response": f"Failed to parse search results: {output[:200]}",
+                        "response": f"🔍 **Search Results for '{keyword}':**\n\n{token_list}\nWould you like me to set up a strategy for any of these?",
                         "thinking": None,
                         "strategy_updated": False,
                         "strategy_needs_confirmation": False,
                         "success": True,
                     }
-            else:
+                else:
+                    return {
+                        "response": f"No tokens found for '{keyword}'. Try a different keyword.",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+            except json.JSONDecodeError:
                 return {
-                    "response": f"Failed to search tokens: {output}",
+                    "response": f"Failed to parse search results: {output[:200]}",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
@@ -802,69 +809,68 @@ class ConversationalAgent:
                 "risk",
                 ["--address", address.strip(), "--chain", "bsc"],
             )
-            if code == 0:
-                try:
-                    data = json.loads(output)
-                    data_field = data.get("data")
-                    risk_data = data_field if isinstance(data_field, dict) else {}
-                    if risk_data:
-                        is_honeypot = risk_data.get("is_honeypot", "unknown")
-                        buy_tax = risk_data.get("buy_tax", 0)
-                        sell_tax = risk_data.get("sell_tax", 0)
-                        status = risk_data.get("status", "unknown")
-                        # Convert is_honeypot to string
-                        if isinstance(is_honeypot, bool):
-                            is_honeypot_str = str(is_honeypot).lower()
-                        elif isinstance(is_honeypot, int):
-                            is_honeypot_str = "true" if is_honeypot == 1 else "false" if is_honeypot == 0 else "unknown"
-                        else:
-                            is_honeypot_str = str(is_honeypot).lower() if is_honeypot else "unknown"
-                        # Convert tax values
-                        try:
-                            buy_tax_val = float(buy_tax) if buy_tax not in (None, "N/A") else 0
-                        except (ValueError, TypeError):
-                            buy_tax_val = 0
-                        try:
-                            sell_tax_val = float(sell_tax) if sell_tax not in (None, "N/A") else 0
-                        except (ValueError, TypeError):
-                            sell_tax_val = 0
-                        risk_text = f"🛡️ **Risk Analysis for `{address}`**\n\n"
-                        risk_text += f"- Status: {status}\n"
-                        risk_text += f"- Honeypot: {is_honeypot_str}\n"
-                        risk_text += f"- Buy Tax: {buy_tax}%\n"
-                        risk_text += f"- Sell Tax: {sell_tax}%\n"
-                        if is_honeypot_str == "true":
-                            risk_text += "\n⚠️ **Warning: This token appears to be a honeypot. Do not buy!**"
-                        elif buy_tax_val > 10 or sell_tax_val > 10:
-                            risk_text += "\n⚠️ **Warning: High tax detected. Trade with caution!**"
-                        else:
-                            risk_text += "\n✅ This token appears safe to trade."
-                        return {
-                            "response": risk_text,
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
+            if self._is_error_output(code, output):
+                return {
+                    "response": f"Failed to get risk data: {output}",
+                    "thinking": None,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": False,
+                    "success": True,
+                }
+            try:
+                data = json.loads(output)
+                data_field = data.get("data")
+                risk_data = data_field if isinstance(data_field, dict) else {}
+                if risk_data:
+                    is_honeypot = risk_data.get("is_honeypot", "unknown")
+                    buy_tax = risk_data.get("buy_tax", 0)
+                    sell_tax = risk_data.get("sell_tax", 0)
+                    status = risk_data.get("status", "unknown")
+                    # Convert is_honeypot to string
+                    if isinstance(is_honeypot, bool):
+                        is_honeypot_str = str(is_honeypot).lower()
+                    elif isinstance(is_honeypot, int):
+                        is_honeypot_str = "true" if is_honeypot == 1 else "false" if is_honeypot == 0 else "unknown"
                     else:
-                        return {
-                            "response": f"No risk data available for `{address}`",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                except json.JSONDecodeError:
+                        is_honeypot_str = str(is_honeypot).lower() if is_honeypot else "unknown"
+                    # Convert tax values
+                    try:
+                        buy_tax_val = float(buy_tax) if buy_tax not in (None, "N/A") else 0
+                    except (ValueError, TypeError):
+                        buy_tax_val = 0
+                    try:
+                        sell_tax_val = float(sell_tax) if sell_tax not in (None, "N/A") else 0
+                    except (ValueError, TypeError):
+                        sell_tax_val = 0
+                    risk_text = f"🛡️ **Risk Analysis for `{address}`**\n\n"
+                    risk_text += f"- Status: {status}\n"
+                    risk_text += f"- Honeypot: {is_honeypot_str}\n"
+                    risk_text += f"- Buy Tax: {buy_tax}%\n"
+                    risk_text += f"- Sell Tax: {sell_tax}%\n"
+                    if is_honeypot_str == "true":
+                        risk_text += "\n⚠️ **Warning: This token appears to be a honeypot. Do not buy!**"
+                    elif buy_tax_val > 10 or sell_tax_val > 10:
+                        risk_text += "\n⚠️ **Warning: High tax detected. Trade with caution!**"
+                    else:
+                        risk_text += "\n✅ This token appears safe to trade."
                     return {
-                        "response": f"Failed to parse risk data: {output[:200]}",
+                        "response": risk_text,
                         "thinking": None,
                         "strategy_updated": False,
                         "strategy_needs_confirmation": False,
                         "success": True,
                     }
-            else:
+                else:
+                    return {
+                        "response": f"No risk data available for `{address}`",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+            except json.JSONDecodeError:
                 return {
-                    "response": f"Failed to get risk data: {output}",
+                    "response": f"Failed to parse risk data: {output[:200]}",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
@@ -994,44 +1000,43 @@ class ConversationalAgent:
                 "price",
                 ["--tokens"] + tokens_list,
             )
-            if code == 0:
-                try:
-                    data = json.loads(output)
-                    prices = data.get("data", {})
-                    if not isinstance(prices, dict):
-                        prices = {}
-                    if prices:
-                        price_text = "💰 **Token Prices:**\n"
-                        for token_id, price_data in prices.items():
-                            price = price_data.get("price", "N/A") if isinstance(price_data, dict) else "N/A"
-                            change_24h = price_data.get("token_price_change_24h", "N/A") if isinstance(price_data, dict) else "N/A"
-                            price_text += f"- {token_id}: ${price} (24h: {change_24h}%)\n"
-                        return {
-                            "response": price_text,
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                    else:
-                        return {
-                            "response": "No price data available.",
-                            "thinking": None,
-                            "strategy_updated": False,
-                            "strategy_needs_confirmation": False,
-                            "success": True,
-                        }
-                except json.JSONDecodeError:
+            if self._is_error_output(code, output):
+                return {
+                    "response": f"Failed to get prices: {output}",
+                    "thinking": None,
+                    "strategy_updated": False,
+                    "strategy_needs_confirmation": False,
+                    "success": True,
+                }
+            try:
+                data = json.loads(output)
+                prices = data.get("data", {})
+                if not isinstance(prices, dict):
+                    prices = {}
+                if prices:
+                    price_text = "💰 **Token Prices:**\n"
+                    for token_id, price_data in prices.items():
+                        price = price_data.get("price", "N/A") if isinstance(price_data, dict) else "N/A"
+                        change_24h = price_data.get("token_price_change_24h", "N/A") if isinstance(price_data, dict) else "N/A"
+                        price_text += f"- {token_id}: ${price} (24h: {change_24h}%)\n"
                     return {
-                        "response": f"Failed to parse price data: {output[:200]}",
+                        "response": price_text,
                         "thinking": None,
                         "strategy_updated": False,
                         "strategy_needs_confirmation": False,
                         "success": True,
                     }
-            else:
+                else:
+                    return {
+                        "response": "No price data available.",
+                        "thinking": None,
+                        "strategy_updated": False,
+                        "strategy_needs_confirmation": False,
+                        "success": True,
+                    }
+            except json.JSONDecodeError:
                 return {
-                    "response": f"Failed to get prices: {output}",
+                    "response": f"Failed to parse price data: {output[:200]}",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
