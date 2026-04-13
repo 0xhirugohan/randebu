@@ -1,0 +1,3 @@
+[submodule "ave-cloud-skill"]
+	path = ave-cloud-skill
+	url = https://github.com/AveCloud/ave-cloud-skill.git
