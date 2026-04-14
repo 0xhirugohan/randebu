@@ -769,7 +769,7 @@ class ConversationalAgent:
                         symbol = t.get("symbol", "")
                         name = t.get("name", "")
                         # Search API uses price_change_24h, trending uses token_price_change_24h
-                        price_change = t.get("price_change_24h") or t.get("token_price_change_24h", "N/A")
+                        price_change = t.get("price_change_24h") or t.get("token_price_change_24h") or "N/A"
                         mc = t.get("market_cap", "N/A")
                         # Store for context
                         if addr and symbol:
