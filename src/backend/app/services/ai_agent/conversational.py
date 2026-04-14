@@ -472,6 +472,9 @@ class ConversationalAgent:
         # Track pending command after acknowledgment
         self.pending_command = None
 
+        # Track recent search results for context
+        self.recent_search_results = []  # List of {symbol, name, address}
+
     def _is_error_output(self, code: int, output: str) -> bool:
         """Check if the command output contains an error."""
         if code != 0:
@@ -758,6 +761,8 @@ class ConversationalAgent:
                 else:
                     tokens = data_field.get("tokens", [])
                 if tokens:
+                    # Store search results for context
+                    self.recent_search_results = []
                     token_list = ""
                     for t in tokens[:10]:
                         addr = t.get("token", "")
@@ -765,6 +770,14 @@ class ConversationalAgent:
                         name = t.get("name", "")
                         price_change = t.get("token_price_change_24h", "N/A")
                         mc = t.get("market_cap", "N/A")
+                        # Store for context
+                        if addr and symbol:
+                            self.recent_search_results.append({
+                                "symbol": symbol,
+                                "name": name,
+                                "address": addr,
+                                "chain": "bsc"
+                            })
                         try:
                             mc_str = f"${float(mc):,.0f}"
                         except (ValueError, TypeError):
@@ -778,6 +791,7 @@ class ConversationalAgent:
                         "success": True,
                     }
                 else:
+                    self.recent_search_results = []
                     return {
                         "response": f"No tokens found for '{keyword}'. Try a different keyword.",
                         "thinking": None,
@@ -990,15 +1004,29 @@ class ConversationalAgent:
             tokens_list = token_ids.replace(",", " ").split()
             if not tokens_list:
                 return {
-                    "response": "No token IDs provided. Please provide token IDs like 'PEPE-bsc TRUMP-bsc'",
+                    "response": "No token provided. Please provide a token address (e.g., '0x...-bsc') or use /search to find a token first.",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
                     "success": True,
                 }
+
+            # Check if input matches recent search results
+            token_input = tokens_list[0].lower()
+            matched_address = None
+            for result in self.recent_search_results:
+                if (result["symbol"].lower() == token_input or 
+                    result["name"].lower() == token_input or
+                    result["address"].lower() == token_input):
+                    matched_address = f"{result['address']}-{result['chain']}"
+                    break
+
+            # Use matched address or original input
+            price_tokens = [matched_address] if matched_address else tokens_list
+
             code, output = self._call_ave_script(
                 "price",
-                ["--tokens"] + tokens_list,
+                ["--tokens"] + price_tokens,
             )
             if self._is_error_output(code, output):
                 return {
@@ -1036,8 +1064,16 @@ class ConversationalAgent:
                         "success": True,
                     }
                 else:
+                    if matched_address:
+                        return {
+                            "response": f"No price data available for {matched_address}. Try using /search to find the token first.",
+                            "thinking": None,
+                            "strategy_updated": False,
+                            "strategy_needs_confirmation": False,
+                            "success": True,
+                        }
                     return {
-                        "response": "No price data available.",
+                        "response": "No price data available. The /price tool requires a token contract address (e.g., '0x6982508145454Ce125dDE157d8d64a26D53f60a2-bsc'). Use /search to find a token first, then use its contract address with /price.",
                         "thinking": None,
                         "strategy_updated": False,
                         "strategy_needs_confirmation": False,
