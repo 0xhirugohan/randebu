@@ -894,6 +894,10 @@ class ConversationalAgent:
 
             result = resp
 
+            # Initialize thinking to None to handle cases where API response
+            # doesn't have the expected message structure (intermittent issue)
+            thinking = None
+
             if result.get("choices") and len(result.get("choices", [])) > 0:
                 choice = result["choices"][0]
                 if "message" in choice:
