@@ -985,27 +985,24 @@ class ConversationalAgent:
             }
 
     def _execute_price(self, token_ids: str) -> Dict[str, Any]:
-        """Execute price lookup for the given token IDs or symbols."""
+        """Execute price lookup for the given token IDs."""
         try:
             tokens_list = token_ids.replace(",", " ").split()
             if not tokens_list:
                 return {
-                    "response": "No token provided. Please provide a token name, symbol, or address like 'PEPE', 'TRUMP', or '0x...'",
+                    "response": "No token IDs provided. Please provide token IDs like 'PEPE-bsc TRUMP-bsc'",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
                     "success": True,
                 }
-            # Use search to find tokens and get their prices
-            # Search for the first token
-            search_keyword = tokens_list[0]
             code, output = self._call_ave_script(
-                "search",
-                ["--keyword", search_keyword.strip(), "--chain", "bsc", "--limit", "5"],
+                "price",
+                ["--tokens"] + tokens_list,
             )
             if self._is_error_output(code, output):
                 return {
-                    "response": f"Failed to search for token: {output}",
+                    "response": f"Failed to get prices: {output}",
                     "thinking": None,
                     "strategy_updated": False,
                     "strategy_needs_confirmation": False,
@@ -1013,21 +1010,15 @@ class ConversationalAgent:
                 }
             try:
                 data = json.loads(output)
-                # Handle both dict with 'tokens' key and direct list
-                data_field = data.get("data", [])
-                if isinstance(data_field, list):
-                    tokens = data_field
-                else:
-                    tokens = data_field.get("tokens", [])
-                if tokens:
+                prices = data.get("data", {})
+                if not isinstance(prices, dict):
+                    prices = {}
+                if prices:
                     price_text = "💰 **Token Prices:**\n"
-                    for t in tokens[:5]:
-                        addr = t.get("token", "")
-                        symbol = t.get("symbol", "")
-                        name = t.get("name", "")
-                        price = t.get("current_price_usd") or t.get("price", "N/A")
-                        change_24h = t.get("token_price_change_24h", "N/A") or t.get("price_change_24h", "N/A")
-                        mc = t.get("market_cap", "N/A")
+                    for token_id, price_data in prices.items():
+                        price = price_data.get("price", "N/A") if isinstance(price_data, dict) else "N/A"
+                        change_24h = price_data.get("token_price_change_24h", "N/A") if isinstance(price_data, dict) else "N/A"
+                        mc = price_data.get("market_cap", "N/A") if isinstance(price_data, dict) else "N/A"
                         try:
                             price_str = f"${float(price):,.6f}" if price and price != "N/A" else price
                         except (ValueError, TypeError):
@@ -1036,7 +1027,7 @@ class ConversationalAgent:
                             mc_str = f"${float(mc):,.0f}" if mc and mc != "N/A" else mc
                         except (ValueError, TypeError):
                             mc_str = str(mc) if mc else "N/A"
-                        price_text += f"- **{symbol}** ({name}): {price_str} (MC: {mc_str})\n"
+                        price_text += f"- **{token_id}**: {price_str} (MC: {mc_str})\n"
                     return {
                         "response": price_text,
                         "thinking": None,
