@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     JSON,
+    Integer,
 )
 from sqlalchemy.orm import relationship
 from ..core.database import Base
@@ -30,6 +31,9 @@ class User(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     bots = relationship("Bot", back_populates="user", cascade="all, delete-orphan")
+    conversations = relationship(
+        "Conversation", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Bot(Base):
@@ -47,7 +51,7 @@ class Bot(Base):
 
     user = relationship("User", back_populates="bots")
     conversations = relationship(
-        "BotConversation", back_populates="bot", cascade="all, delete-orphan"
+        "Conversation", back_populates="bot", cascade="all, delete-orphan"
     )
     backtests = relationship(
         "Backtest", back_populates="bot", cascade="all, delete-orphan"
@@ -56,6 +60,47 @@ class Bot(Base):
         "Simulation", back_populates="bot", cascade="all, delete-orphan"
     )
     signals = relationship("Signal", back_populates="bot", cascade="all, delete-orphan")
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=True)
+    anonymous_token = Column(String(64), nullable=True)
+    bot_id = Column(String, ForeignKey("bots.id"), nullable=True)
+    title = Column(String(255), default="New Conversation")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="conversations")
+    bot = relationship("Bot", back_populates="conversations")
+    messages = relationship(
+        "Message", back_populates="conversation", cascade="all, delete-orphan"
+    )
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    conversation_id = Column(String, ForeignKey("conversations.id"), nullable=True)
+    role = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("Conversation", back_populates="messages")
+
+
+class AnonymousUser(Base):
+    __tablename__ = "anonymous_users"
+
+    id = Column(String(64), primary_key=True)
+    chat_count = Column(Integer, default=0)
+    bot_created = Column(Boolean, default=False)
+    backtest_count = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class BotConversation(Base):
@@ -118,6 +163,9 @@ class Signal(Base):
 
 
 Index("idx_bots_user_id", Bot.user_id)
+Index("idx_conversations_user_id", Conversation.user_id)
+Index("idx_conversations_bot_id", Conversation.bot_id)
+Index("idx_messages_conversation_id", Message.conversation_id)
 Index("idx_conversations_bot_id", BotConversation.bot_id)
 Index("idx_backtests_bot_id", Backtest.bot_id)
 Index("idx_simulations_bot_id", Simulation.bot_id)

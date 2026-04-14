@@ -37,6 +37,50 @@ TOOL_REGISTRY: Dict[str, Any] = {
                 "example": "Buy PEPE when it drops 10% within 1 hour",
             },
         },
+        {
+            "name": "create_bot",
+            "description": "Create a new trading bot",
+            "category": "Randebu Built-in",
+            "command": None,
+            "details": {
+                "description": "Create a new trading bot linked to the current conversation.",
+                "usage": "create_bot <name> [--strategy <strategy_desc>]",
+                "example": "create_bot MyBot --strategy Buy PEPE when it drops 5%",
+            },
+        },
+        {
+            "name": "list_bots",
+            "description": "List your trading bots",
+            "category": "Randebu Built-in",
+            "command": None,
+            "details": {
+                "description": "List all trading bots you own.",
+                "usage": "list_bots",
+                "example": "list_bots",
+            },
+        },
+        {
+            "name": "set_bot",
+            "description": "Set bot for this conversation",
+            "category": "Randebu Built-in",
+            "command": None,
+            "details": {
+                "description": "Associate a bot with the current conversation.",
+                "usage": "set_bot <bot_id>",
+                "example": "set_bot abc-123-def",
+            },
+        },
+        {
+            "name": "get_bot_info",
+            "description": "Get current bot details",
+            "category": "Randebu Built-in",
+            "command": None,
+            "details": {
+                "description": "Get details of the current bot for display in the right pane.",
+                "usage": "get_bot_info [bot_id]",
+                "example": "get_bot_info abc-123-def",
+            },
+        },
     ],
     "ave": [
         {

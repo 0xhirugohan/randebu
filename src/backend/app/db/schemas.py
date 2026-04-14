@@ -242,3 +242,57 @@ class AveChainSwapRequest(BaseModel):
 class AveChainSwapResponse(BaseModel):
     swap: Optional[dict] = None
     upsell_message: Optional[str] = None
+
+
+class ConversationResponse(BaseModel):
+    id: str
+    user_id: Optional[str]
+    anonymous_token: Optional[str]
+    bot_id: Optional[str]
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MessageResponse(BaseModel):
+    id: str
+    conversation_id: Optional[str]
+    role: str
+    content: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ConversationWithMessagesResponse(BaseModel):
+    id: str
+    user_id: Optional[str]
+    anonymous_token: Optional[str]
+    bot_id: Optional[str]
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    messages: List[MessageResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class SetBotRequest(BaseModel):
+    bot_id: str
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    thinking: Optional[str] = None
+    strategy_config: Optional[dict] = None
+    success: bool = False
+    warning: Optional[str] = None
