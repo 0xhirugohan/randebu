@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from .api import auth, bots, backtest, simulate, config, ave
+from .api import auth, bots, backtest, simulate, config, ave, conversations
 from .core.limiter import limiter
 from .core.database import engine, Base
 
@@ -15,12 +15,22 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     # Import all models to ensure they're registered
-    from .db.models import User, Bot, BotConversation, Backtest, Simulation, Signal
-    
+    from .db.models import (
+        User,
+        Bot,
+        BotConversation,
+        Backtest,
+        Simulation,
+        Signal,
+        Conversation,
+        Message,
+        AnonymousUser,
+    )
+
     # Create tables if they don't exist
     Base.metadata.create_all(bind=engine)
     logger.info("Database initialized successfully")
-    
+
     yield
     # Cleanup on shutdown if needed
 
@@ -44,6 +54,9 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(bots.router, prefix="/api/bots", tags=["bots"])
+app.include_router(
+    conversations.router, prefix="/api/conversations", tags=["conversations"]
+)
 app.include_router(backtest.router, prefix="/api", tags=["backtest"])
 app.include_router(simulate.router, prefix="/api", tags=["simulate"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
