@@ -16,7 +16,7 @@ from ..db.schemas import (
 )
 from ..db.models import Bot, BotConversation, User
 from ..services.ai_agent.crew import get_trading_crew
-from ..services.ai_agent.conversational import get_conversational_agent
+from ..services.ai_agent import get_conversational_agent
 
 router = APIRouter()
 MAX_BOTS_PER_USER = 3
@@ -190,7 +190,7 @@ def chat(
     ]
 
     user_message = request.message
-    
+
     # Use ConversationalAgent for natural chat with tool-calling
     agent = get_conversational_agent(bot_id=bot_id)
     result = agent.chat(user_message, history_for_agent)
@@ -224,7 +224,9 @@ def chat(
         strategy_config=bot.strategy_config if result.get("strategy_updated") else None,
         success=result.get("success", False),
         strategy_needs_confirmation=result.get("strategy_needs_confirmation", False),
-        strategy_data=result.get("strategy_data") if result.get("strategy_needs_confirmation") else None,
+        strategy_data=result.get("strategy_data")
+        if result.get("strategy_needs_confirmation")
+        else None,
         token_search_results=result.get("token_search_results"),
     )
 

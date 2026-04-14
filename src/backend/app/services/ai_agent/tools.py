@@ -1,0 +1,128 @@
+"""Tool registry and definitions for the conversational agent."""
+
+from typing import Dict, Any, List
+
+TOOL_REGISTRY: Dict[str, Any] = {
+    "randebu": [
+        {
+            "name": "backtest",
+            "description": "Run strategy backtest",
+            "category": "Randebu Built-in",
+            "command": "/backtest",
+            "details": {
+                "description": "Run a backtest to evaluate how the current trading strategy would have performed historically.",
+                "usage": "/backtest [token_address] [--timeframe 1d|4h|1h|15m] [--start YYYY-MM-DD] [--end YYYY-MM-DD]",
+                "example": "Run a backtest on PEPE for the last 30 days",
+            },
+        },
+        {
+            "name": "simulate",
+            "description": "Start/stop simulation",
+            "category": "Randebu Built-in",
+            "command": "/simulate",
+            "details": {
+                "description": "Start or stop trading simulations that run on real-time klines.",
+                "usage": "/simulate start|stop|status|results [token_address]",
+                "example": "Start a simulation on PEPE",
+            },
+        },
+        {
+            "name": "strategy",
+            "description": "View/update strategy",
+            "category": "Randebu Built-in",
+            "command": "/strategy",
+            "details": {
+                "description": "View your current trading strategy or update it with new parameters.",
+                "usage": "Describe your strategy in plain English, e.g., 'Buy PEPE when price drops 5%'",
+                "example": "Buy PEPE when it drops 10% within 1 hour",
+            },
+        },
+    ],
+    "ave": [
+        {
+            "name": "search",
+            "description": "Token search",
+            "category": "AVE Cloud Skills",
+            "command": "/search",
+            "details": {
+                "description": "Find tokens by keyword, symbol, or contract address on BSC.",
+                "usage": "search <keyword> [--chain bsc] [--limit 20]",
+                "example": "search PEPE\nsearch 0x1234... --chain bsc",
+            },
+        },
+        {
+            "name": "trending",
+            "description": "Popular tokens",
+            "category": "AVE Cloud Skills",
+            "command": "/trending",
+            "details": {
+                "description": "Get list of trending/popular tokens on BSC.",
+                "usage": "trending [--chain bsc] [--limit 20]",
+                "example": "trending --chain bsc\ntrending --limit 10",
+            },
+        },
+        {
+            "name": "risk",
+            "description": "Honeypot detection",
+            "category": "AVE Cloud Skills",
+            "command": "/risk",
+            "details": {
+                "description": "Get risk analysis for a token contract including honeypot assessment.",
+                "usage": "risk <token_address> [--chain bsc]",
+                "example": "risk 0x6982508145454Ce125dDE157d8d64a26D53f60a2",
+            },
+        },
+        {
+            "name": "token",
+            "description": "Token details",
+            "category": "AVE Cloud Skills",
+            "command": "/token",
+            "details": {
+                "description": "Get detailed information about a specific token including price, market cap, and pairs.",
+                "usage": "token <address> [--chain bsc]",
+                "example": "token 0x6982508145454Ce125dDE157d8d64a26D53f60a2",
+            },
+        },
+        {
+            "name": "price",
+            "description": "Batch prices",
+            "category": "AVE Cloud Skills",
+            "command": "/price",
+            "details": {
+                "description": "Get current price(s) for multiple tokens.",
+                "usage": "price <token_id>,<token_id>,... (e.g., PEPE-bsc,TRUMP-bsc)",
+                "example": "price PEPE-bsc,TRUMP-bsc",
+            },
+        },
+    ],
+}
+
+SKILL_EMOJIS: Dict[str, str] = {
+    "backtest": "📊",
+    "simulate": "🎮",
+    "strategy": "📝",
+    "search": "🔍",
+    "trending": "📈",
+    "risk": "📉",
+    "token": "🪙",
+    "price": "💰",
+}
+
+
+def get_tool_registry() -> Dict[str, Any]:
+    """Return the tool registry for slash command help."""
+    return TOOL_REGISTRY
+
+
+def get_tools_by_category(category: str) -> List[Dict[str, Any]]:
+    """Get tools filtered by category."""
+    return TOOL_REGISTRY.get(category, [])
+
+
+def get_tool_by_name(tool_name: str) -> Dict[str, Any]:
+    """Get a tool by its name."""
+    for category in ["randebu", "ave"]:
+        for tool in TOOL_REGISTRY.get(category, []):
+            if tool["name"].lower() == tool_name.lower():
+                return tool
+    return None
