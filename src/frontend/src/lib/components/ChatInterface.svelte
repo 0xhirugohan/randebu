@@ -3,6 +3,35 @@
 	import type { ChatMessage } from '$lib/stores/chatStore';
 	import { parseMarkdown, parseInlineElements, type InlineSegment } from '$lib/utils/markdown';
 
+	interface ToolItem {
+		name: string;
+		description: string;
+		command: string;
+	}
+
+	const TOOLS: { category: string; label: string; tools: ToolItem[] }[] = [
+		{
+			category: 'randebu',
+			label: '🤖 Randebu Built-in',
+			tools: [
+				{ name: 'backtest', description: 'Run strategy backtest', command: '/backtest' },
+				{ name: 'simulate', description: 'Start/stop simulation', command: '/simulate' },
+				{ name: 'strategy', description: 'View/update strategy', command: '/strategy' },
+			]
+		},
+		{
+			category: 'ave',
+			label: '☁️ AVE Cloud Skills',
+			tools: [
+				{ name: 'search', description: 'Token search', command: '/search' },
+				{ name: 'trending', description: 'Popular tokens', command: '/trending' },
+				{ name: 'risk', description: 'Honeypot detection', command: '/risk' },
+				{ name: 'token', description: 'Token details', command: '/token' },
+				{ name: 'price', description: 'Batch prices', command: '/price' },
+			]
+		}
+	];
+
 	interface Props {
 		bot: Bot | null;
 		messages: ChatMessage[];
@@ -26,9 +55,16 @@
 	let messageInput = $state('');
 	let chatContainer: HTMLDivElement;
 	let expandedThinking: Record<string, boolean> = $state({});
+	let showSlashMenu = $state(false);
+	let slashMenuPosition = $state({ top: 0, left: 0 });
+	let selectedIndex = $state(0);
+
+	// Use $derived for filteredTools
+	let filteredTools = $derived(messageInput.startsWith('/') ? TOOLS.flatMap(t => t.tools).filter(tool => tool.name.toLowerCase().startsWith(messageInput.slice(1).toLowerCase()) || tool.command.toLowerCase().startsWith(messageInput.slice(1).toLowerCase())) : []);
 
 	function handleSend() {
 		if (!messageInput.trim()) return;
+		showSlashMenu = false;
 		onSendMessage(messageInput);
 		messageInput = '';
 	}
@@ -36,7 +72,54 @@
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Enter' && !e.shiftKey) {
 			e.preventDefault();
-			handleSend();
+			if (showSlashMenu && filteredTools.length > 0) {
+				selectTool(filteredTools[selectedIndex]);
+			} else {
+				handleSend();
+			}
+		} else if (e.key === 'ArrowDown' && showSlashMenu) {
+			e.preventDefault();
+			selectedIndex = Math.min(selectedIndex + 1, filteredTools.length - 1);
+		} else if (e.key === 'ArrowUp' && showSlashMenu) {
+			e.preventDefault();
+			selectedIndex = Math.max(selectedIndex - 1, 0);
+		} else if (e.key === 'Escape' && showSlashMenu) {
+			showSlashMenu = false;
+		} else if (e.key === 'Tab' && showSlashMenu && filteredTools.length > 0) {
+			e.preventDefault();
+			selectTool(filteredTools[selectedIndex]);
+		}
+	}
+
+	function handleInput(e: Event) {
+		const target = e.target as HTMLTextAreaElement;
+		const value = target.value;
+		messageInput = value;
+
+		if (value.startsWith('/')) {
+			selectedIndex = 0;
+			showSlashMenu = filteredTools.length > 0;
+
+			if (showSlashMenu) {
+				// Position menu above the textarea
+				const rect = target.getBoundingClientRect();
+				const menuHeight = 300;
+				slashMenuPosition = {
+					top: Math.max(10, rect.top - menuHeight),
+					left: rect.left
+				};
+			}
+		} else {
+			showSlashMenu = false;
+		}
+	}
+
+	function selectTool(tool: ToolItem) {
+		messageInput = tool.command + ' ';
+		showSlashMenu = false;
+		const textarea = document.querySelector('.input-container textarea') as HTMLTextAreaElement;
+		if (textarea) {
+			textarea.focus();
 		}
 	}
 
@@ -74,7 +157,16 @@
 			}
 		}).join('');
 	}
+
+	function handleClickOutside(e: MouseEvent) {
+		const target = e.target as HTMLElement;
+		if (!target.closest('.slash-menu') && !target.closest('.input-container textarea')) {
+			showSlashMenu = false;
+		}
+	}
 </script>
+
+<svelte:window on:click={handleClickOutside} />
 
 <div class="chat-interface">
 	{#if showBotSelector && availableBots.length > 0}
@@ -215,10 +307,32 @@
 
 	{#if bot}
 		<div class="input-container">
+			{#if showSlashMenu && filteredTools.length > 0}
+				<div class="slash-menu" style="top: {slashMenuPosition.top}px; left: {slashMenuPosition.left}px;">
+					<div class="slash-menu-header">Available Commands</div>
+					{#each TOOLS as group}
+						{#if group.tools.some(t => filteredTools.includes(t))}
+							<div class="slash-menu-category">{group.label}</div>
+							{#each group.tools.filter(t => filteredTools.includes(t)) as tool, i}
+								<button
+									class="slash-menu-item"
+									class:selected={filteredTools.indexOf(tool) === selectedIndex}
+									onclick={() => selectTool(tool)}
+								>
+									<span class="slash-command">{tool.command}</span>
+									<span class="slash-description">{tool.description}</span>
+								</button>
+							{/each}
+						{/if}
+					{/each}
+					<div class="slash-menu-hint">Press Tab to select, Enter to send</div>
+				</div>
+			{/if}
 			<textarea
-				bind:value={messageInput}
+				value={messageInput}
+				oninput={handleInput}
 				onkeydown={handleKeydown}
-				placeholder="Describe your trading strategy..."
+				placeholder="Describe your trading strategy... (or type / for commands)"
 				rows="1"
 			></textarea>
 			<button onclick={handleSend}>
@@ -554,5 +668,77 @@
 	button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	.slash-menu {
+		position: fixed;
+		background: rgba(20, 20, 20, 0.98);
+		border: 1px solid rgba(255, 255, 255, 0.15);
+		border-radius: 12px;
+		padding: 0.5rem;
+		min-width: 280px;
+		max-width: 400px;
+		max-height: 300px;
+		overflow-y: auto;
+		z-index: 1000;
+		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+	}
+
+	.slash-menu-header {
+		font-size: 0.75rem;
+		color: #888;
+		padding: 0.5rem 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+		margin-bottom: 0.5rem;
+	}
+
+	.slash-menu-category {
+		font-size: 0.75rem;
+		color: #666;
+		padding: 0.5rem 0.75rem 0.25rem;
+	}
+
+	.slash-menu-item {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		background: transparent;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		text-align: left;
+		transition: background 0.15s;
+		margin: 0.15rem 0;
+	}
+
+	.slash-menu-item:hover,
+	.slash-menu-item.selected {
+		background: rgba(102, 126, 234, 0.2);
+	}
+
+	.slash-command {
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+		font-size: 0.9rem;
+		color: #667eea;
+		font-weight: 500;
+	}
+
+	.slash-description {
+		font-size: 0.8rem;
+		color: #888;
+		margin-top: 0.15rem;
+	}
+
+	.slash-menu-hint {
+		font-size: 0.7rem;
+		color: #555;
+		padding: 0.5rem 0.75rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
+		margin-top: 0.5rem;
+		text-align: center;
 	}
 </style>
