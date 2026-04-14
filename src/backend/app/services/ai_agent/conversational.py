@@ -839,14 +839,31 @@ class ConversationalAgent:
                     is_honeypot = risk_data.get("is_honeypot", "unknown")
                     buy_tax = risk_data.get("buy_tax", 0)
                     sell_tax = risk_data.get("sell_tax", 0)
-                    status = risk_data.get("status", "unknown")
+                    risk_level = risk_data.get("risk_level", 0)
+                    risk_score = risk_data.get("risk_score", "N/A")
+                    token_symbol = risk_data.get("token_symbol", "")
+                    token_name = risk_data.get("token_name", "")
+                    
+                    # Format token label
+                    if token_symbol:
+                        token_label = f"**{token_symbol}** ({token_name}) - `{address}`"
+                    else:
+                        token_label = f"`{address}`"
+                    
                     # Convert is_honeypot to string
+                    # -1 = unknown/could not determine, 0 = false, 1 = true
                     if isinstance(is_honeypot, bool):
                         is_honeypot_str = str(is_honeypot).lower()
                     elif isinstance(is_honeypot, int):
-                        is_honeypot_str = "true" if is_honeypot == 1 else "false" if is_honeypot == 0 else "unknown"
+                        if is_honeypot == 1:
+                            is_honeypot_str = "true"
+                        elif is_honeypot == 0:
+                            is_honeypot_str = "false"
+                        else:
+                            is_honeypot_str = "Unknown (could not determine)"
                     else:
-                        is_honeypot_str = str(is_honeypot).lower() if is_honeypot else "unknown"
+                        is_honeypot_str = str(is_honeypot).lower() if is_honeypot else "Unknown (could not determine)"
+                    
                     # Convert tax values
                     try:
                         buy_tax_val = float(buy_tax) if buy_tax not in (None, "N/A") else 0
@@ -856,11 +873,16 @@ class ConversationalAgent:
                         sell_tax_val = float(sell_tax) if sell_tax not in (None, "N/A") else 0
                     except (ValueError, TypeError):
                         sell_tax_val = 0
-                    risk_text = f"🛡️ **Risk Analysis for `{address}`**\n\n"
-                    risk_text += f"- Status: {status}\n"
+                    
+                    # Determine risk level label
+                    risk_level_str = "Low" if risk_level == 0 else "Medium" if risk_level == 1 else "High" if risk_level == 2 else "Unknown"
+                    
+                    risk_text = f"🛡️ **Risk Analysis for {token_label}**\n\n"
+                    risk_text += f"- Risk Level: {risk_level_str} (Score: {risk_score})\n"
                     risk_text += f"- Honeypot: {is_honeypot_str}\n"
                     risk_text += f"- Buy Tax: {buy_tax}%\n"
                     risk_text += f"- Sell Tax: {sell_tax}%\n"
+                    
                     if is_honeypot_str == "true":
                         risk_text += "\n⚠️ **Warning: This token appears to be a honeypot. Do not buy!**"
                     elif buy_tax_val > 10 or sell_tax_val > 10:
